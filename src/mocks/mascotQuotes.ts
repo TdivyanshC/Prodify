@@ -1,0 +1,60 @@
+// TODO(placeholder copy): stands in for the real quote library in
+// prodify_full_architecture.md §7, which isn't in this repo yet. Swap every
+// array below for the real copy once that file is added — per claude.md §8
+// this fixture should stay the single source the Phase 2 Mascot Engine also
+// reads from, so copy is never maintained in two places.
+
+export type MascotQuoteCategory =
+  | 'onboarding'
+  | 'welcomeBack'
+  | 'streakAtRisk'
+  | 'celebration'
+  | 'sessionComplete'
+  | 'missedTarget'
+  | 'badgeEarned'
+  | 'friendUpdate'
+  | 'levelUp'
+  | 'idle';
+
+export const mascotQuotes: Record<MascotQuoteCategory, string[]> = {
+  onboarding: [
+    "Hey, I'm Spark. I'll be here cheering you on every session.",
+    "Let's light this up together — one session at a time.",
+  ],
+  welcomeBack: [
+    "You came back! My glow missed you.",
+    "Good to see you again — ready to pick things back up?",
+  ],
+  streakAtRisk: [
+    "Your streak's flickering — one session today keeps it alive.",
+    "Don't let today slip! A quick session is all it takes to protect your streak.",
+  ],
+  celebration: [
+    "That's the energy! Keep it going.",
+    "Look at you go — I'm glowing brighter just watching.",
+  ],
+  sessionComplete: [
+    "Session done! That's another log on the fire.",
+    "Nice work wrapping that up — proud of you.",
+  ],
+  missedTarget: [
+    "Didn't hit the full target this time — that's okay, showing up still counts.",
+    "Not every session goes to plan, and that's fine. Same time next round?",
+  ],
+  badgeEarned: [
+    "New badge unlocked! You earned that one.",
+    "Shiny! Add that badge to the collection.",
+  ],
+  friendUpdate: [
+    "One of your friends just crushed a session — send them some fire.",
+    "Your crew's been busy. Check out what they've been up to.",
+  ],
+  levelUp: [
+    "Level up! I can feel myself getting brighter.",
+    "You leveled up — this glow is well earned.",
+  ],
+  idle: [
+    "Whenever you're ready, I'll be right here.",
+    "Quiet moment — good time to plan your next session.",
+  ],
+};
