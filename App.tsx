@@ -1,24 +1,45 @@
-import { NavigationContainer } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { DarkTheme, NavigationContainer, Theme } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
+import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { HomeScreen } from './src/screens/HomeScreen';
+import { LoadingScreen } from './src/components/LoadingScreen/LoadingScreen';
+import { SparkOverlay } from './src/components/Mascot/SparkOverlay';
+import { Popup } from './src/components/Popup/Popup';
+import { ThemeDebugBadge } from './src/components/ThemeDebugBadge/ThemeDebugBadge';
+import { RootStack } from './src/navigation/RootStack';
+import { colors } from './src/theme';
+import { useAppFonts } from './src/theme/useAppFonts';
 
-export type RootStackParamList = {
-  Home: undefined;
+const navigationTheme: Theme = {
+  ...DarkTheme,
+  colors: {
+    ...DarkTheme.colors,
+    background: colors.background,
+    card: colors.surface,
+    text: colors.textPrimary,
+    border: colors.border,
+    primary: colors.primary,
+  },
 };
 
-const Stack = createNativeStackNavigator<RootStackParamList>();
-
 export default function App() {
+  const [fontsLoaded] = useAppFonts();
+
+  if (!fontsLoaded) {
+    return <LoadingScreen />;
+  }
+
   return (
-    <SafeAreaProvider>
-      <NavigationContainer>
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="Home" component={HomeScreen} />
-        </Stack.Navigator>
-      </NavigationContainer>
-      <StatusBar style="auto" />
-    </SafeAreaProvider>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <SafeAreaProvider>
+        <NavigationContainer theme={navigationTheme}>
+          <RootStack />
+        </NavigationContainer>
+        <SparkOverlay />
+        <Popup />
+        <ThemeDebugBadge />
+        <StatusBar style="light" />
+      </SafeAreaProvider>
+    </View>
   );
 }

@@ -36,12 +36,28 @@ export interface SessionParticipant {
   leftAt: string | null;
   completed: boolean;
   targetHit: boolean;
+  // Denormalized display fields — a real API would resolve these via a
+  // join with `users`; stored directly here for the Phase 1 mock so
+  // session cards don't need a separate participant-lookup service.
+  displayName: string;
+  avatarInitial: string;
 }
 
 export interface Session {
   _id: string;
   categoryId: string;
   templateId: string | null;
+  // `name`/`description`/`isPublic` are additive beyond the original §5
+  // shape (a real backend would likely resolve name via sessionTemplates)
+  // — added directly here since Phase 1 has no templates layer yet.
+  name: string;
+  description: string | null;
+  isPublic: boolean;
+  maxParticipants: number | null;
+  // Real headline count (e.g. "24 people") — `participants` below only
+  // holds a small preview for avatar rendering, so mocks don't need to
+  // hand-author dozens of fake participant records.
+  participantCount: number;
   type: 'solo' | 'multiplayer';
   hostId: string | null;
   isBotSeeded: boolean;
@@ -57,6 +73,11 @@ export interface Badge {
   description: string;
   criteriaType: string;
   criteriaValue: number;
+  // Additive UI field beyond the original §5 shape, same precedent as
+  // Session's denormalized display fields (§6a) — a real badge catalog
+  // would likely resolve iconography through a design/content system, but
+  // Phase 1 has no such layer yet.
+  icon?: string;
 }
 
 export interface Friendship {

@@ -1,10 +1,13 @@
 import { StyleSheet, Text, View } from 'react-native';
 import type { Streak } from '../../types/models';
+import { colors, fonts } from '../../theme';
 
 interface StreakIndicatorProps {
   streak: Streak;
 }
 
+// The streak flame + count are the one place outside badges/level-up/
+// subscription that accentGold is allowed (claude.md §3a discipline rule).
 export function StreakIndicator({ streak }: StreakIndicatorProps) {
   return (
     <View style={styles.container}>
@@ -27,17 +30,19 @@ const styles = StyleSheet.create({
     fontSize: 28,
   },
   count: {
+    fontFamily: fonts.headingBold,
     fontSize: 32,
-    fontWeight: '700',
-    color: '#1c1c1e',
+    color: colors.accentGold,
   },
   label: {
+    fontFamily: fonts.bodyRegular,
     fontSize: 13,
-    color: '#6b6b6b',
+    color: colors.textSecondary,
   },
   freezes: {
     marginTop: 6,
+    fontFamily: fonts.bodyMedium,
     fontSize: 12,
-    color: '#4a90d9',
+    color: colors.primaryLight,
   },
 });

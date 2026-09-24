@@ -1,0 +1,107 @@
+import type { Session } from '../types/models';
+
+const now = Date.now();
+const minutesAgo = (n: number) => new Date(now - n * 60 * 1000).toISOString();
+
+function previewParticipants(names: string[]) {
+  return names.map((displayName, i) => ({
+    userId: `user_seed_${i}_${displayName.toLowerCase()}`,
+    joinedAt: minutesAgo(10),
+    leftAt: null,
+    completed: false,
+    targetHit: false,
+    displayName,
+    avatarInitial: displayName[0],
+  }));
+}
+
+// Mock live sessions across themes — realistic but bot-seeded (claude.md
+// §4: bot-seeded sessions use auto-generated counts, never fake 1:1
+// reactions/friendships). Real sessions come from live backend data later.
+export const mockLiveSessions: Session[] = [
+  {
+    _id: 'session_late_night_dsa',
+    categoryId: 'cat_coding',
+    templateId: null,
+    name: 'Late Night DSA',
+    description: 'Grinding arrays and DP problems together.',
+    isPublic: true,
+    maxParticipants: null,
+    participantCount: 24,
+    type: 'multiplayer',
+    hostId: 'user_seed_host_1',
+    isBotSeeded: true,
+    startTime: minutesAgo(22),
+    durationTargetMin: 60,
+    status: 'active',
+    participants: previewParticipants(['Riya', 'Arjun', 'Meera', 'Kabir']),
+  },
+  {
+    _id: 'session_silent_study',
+    categoryId: 'cat_study',
+    templateId: null,
+    name: 'Silent Study',
+    description: 'No talking, just focused work.',
+    isPublic: true,
+    maxParticipants: null,
+    participantCount: 47,
+    type: 'multiplayer',
+    hostId: 'user_seed_host_2',
+    isBotSeeded: true,
+    startTime: minutesAgo(68),
+    durationTargetMin: 120,
+    status: 'active',
+    participants: previewParticipants(['Ananya', 'Dev', 'Sara', 'Ishaan', 'Priya']),
+  },
+  {
+    _id: 'session_morning_lift',
+    categoryId: 'cat_fitness',
+    templateId: null,
+    name: 'Morning Lift Club',
+    description: null,
+    isPublic: true,
+    maxParticipants: 20,
+    participantCount: 9,
+    type: 'multiplayer',
+    hostId: 'user_seed_host_3',
+    isBotSeeded: true,
+    startTime: minutesAgo(15),
+    durationTargetMin: 45,
+    status: 'active',
+    participants: previewParticipants(['Rohan', 'Zara']),
+  },
+  {
+    _id: 'session_deep_work_sprint',
+    categoryId: 'cat_work',
+    templateId: null,
+    name: 'Deep Work Sprint',
+    description: 'Inbox zero and one big task, no meetings.',
+    isPublic: true,
+    maxParticipants: null,
+    participantCount: 15,
+    type: 'multiplayer',
+    hostId: 'user_seed_host_4',
+    isBotSeeded: true,
+    startTime: minutesAgo(5),
+    durationTargetMin: 90,
+    status: 'active',
+    participants: previewParticipants(['Nikhil', 'Fatima', 'Owen']),
+  },
+  {
+    _id: 'session_evening_wind_down',
+    categoryId: 'cat_wellness',
+    templateId: null,
+    name: 'Evening Wind Down',
+    description: 'Gentle stretching and breathing.',
+    isPublic: true,
+    maxParticipants: 30,
+    participantCount: 12,
+    type: 'multiplayer',
+    hostId: 'user_seed_host_5',
+    isBotSeeded: true,
+    startTime: minutesAgo(30),
+    durationTargetMin: 40,
+    status: 'active',
+    participants: previewParticipants(['Leah', 'Marcus']),
+  },
+];

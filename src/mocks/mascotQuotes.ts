@@ -6,8 +6,12 @@
 
 export type MascotQuoteCategory =
   | 'onboarding'
+  | 'returning'
+  | 'regular'
   | 'welcomeBack'
   | 'streakAtRisk'
+  | 'streakMilestone'
+  | 'xpMilestone'
   | 'celebration'
   | 'sessionComplete'
   | 'missedTarget'
@@ -18,24 +22,40 @@ export type MascotQuoteCategory =
 
 export const mascotQuotes: Record<MascotQuoteCategory, string[]> = {
   onboarding: [
-    "Hey, I'm Spark. I'll be here cheering you on every session.",
+    'Hey! I’m Spark ✨\nLet’s make today count.',
     "Let's light this up together — one session at a time.",
   ],
+  returning: [
+    'Back again? 🔥',
+    "There you are — let's keep it going.",
+  ],
+  regular: [
+    'Another session?\nYou’re becoming predictable 😏',
+    "At this point we're basically a team.",
+  ],
   welcomeBack: [
-    "You came back! My glow missed you.",
+    'Psst...\nI haven’t seen you in a while 👀',
     "Good to see you again — ready to pick things back up?",
   ],
   streakAtRisk: [
     "Your streak's flickering — one session today keeps it alive.",
     "Don't let today slip! A quick session is all it takes to protect your streak.",
   ],
+  streakMilestone: [
+    '7 days?!\nOkay... we’re building something here 👀',
+    "That's a real streak now. I'm impressed.",
+  ],
+  xpMilestone: [
+    'You just crossed 1,000 XP!',
+    "That's a new personal high. Nicely done.",
+  ],
   celebration: [
     "That's the energy! Keep it going.",
     "Look at you go — I'm glowing brighter just watching.",
   ],
   sessionComplete: [
+    'That was solid! 🔥\nYou just added {minutes} productive minutes.',
     "Session done! That's another log on the fire.",
-    "Nice work wrapping that up — proud of you.",
   ],
   missedTarget: [
     "Didn't hit the full target this time — that's okay, showing up still counts.",
@@ -46,7 +66,7 @@ export const mascotQuotes: Record<MascotQuoteCategory, string[]> = {
     "Shiny! Add that badge to the collection.",
   ],
   friendUpdate: [
-    "One of your friends just crushed a session — send them some fire.",
+    '{name} just finished a session.',
     "Your crew's been busy. Check out what they've been up to.",
   ],
   levelUp: [

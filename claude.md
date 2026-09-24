@@ -44,6 +44,79 @@ Auth screen: build the visual UI for sign-in/register now, but **do not implemen
 
 ---
 
+## 3a. Design System — Deep Focus Theme v3 (locked)
+
+Goal: the app should feel like something a user would pay for, not a free utility. Dark-first UI, teal/emerald as the brand color, with a warm gold accent reserved exclusively for premium/reward moments (badges, streaks, level-ups, subscription screen) so it stays special rather than diluted.
+
+**v3 revision note:** after v1/v2 shipped a violet brand color, we ran a side-by-side comparison of four full palettes against the same built Home screen — Midnight Violet (the v2 palette, kept as the neutral baseline), Royal Indigo (bluer/cooler violet), Ember Plum (warmer magenta/fuchsia), and Deep Focus (teal/emerald, leaving the violet family entirely). Deep Focus won: a teal/emerald brand color is the color family most associated with calm/focus/productivity tools (Notion, Todoist, Forest, RescueTime), and it reads as "focus tool" rather than "game," which matches the product identity's "Focus first, gamification second" ordering (§3b) better than any shade of violet did. `accentGold` and the semantic tokens (`success`/`warning`/`error`) were held constant across all four candidates during the comparison so the decision isolated the brand-hue question — they're unchanged here. The rejected palettes are kept as data in `src/theme/palettes.ts` (not deleted) in case the brand hue is ever revisited; `src/theme/activeTheme.ts` is the single switch point if so — see that file's header comment for how to preview a different one.
+
+**Color tokens:**
+```js
+// theme/colors.ts (resolved from src/theme/palettes.ts → palettes.deepFocus)
+export const colors = {
+  background: "#071716",       // deepest — teal-black, not neutral gray-black
+  surface: "#0F211F",          // structural surface (cards' resting state)
+  surfaceElevated: "#15302C",  // one step up — modals, the "hero" card
+  surfaceMuted: "#122622",     // pills/chips/inactive chrome — quieter than surface
+  primary: "#14B8A6",          // brand teal — reserved for real CTAs/active states
+  primaryDeep: "#0F766E",      // gradients, pressed states
+  primaryLight: "#5EEAD4",     // highlights, active states
+  primarySoft: "rgba(20, 184, 166, 0.18)", // tinted backgrounds for active/selected chrome
+  accentGold: "#F2B705",       // RESERVED: badges, streak flame, level-up, subscription CTA only
+  textPrimary: "#F0FBFA",      // near-white, teal-tinted
+  textSecondary: "#93B4AF",    // muted teal-gray for calmer hierarchy
+  textMuted: "#547873",
+  border: "#1C3733",           // low-contrast, restrained
+  borderStrong: "#2A4F49",     // elements needing a touch more edge definition
+  sheen: "rgba(255, 255, 255, 0.10)", // top-edge gloss highlight for the 3D button/card treatment
+  success: "#34D399",          // soft green — streak safe (kept distinct from `primary` teal)
+  warning: "#F59E0B",          // warm amber — streak at risk, gentle nudge, never shaming
+  error: "#F87171",            // muted red — true errors only, distinct from warning
+};
+
+export const gradients = {
+  primary: ["#0F766E", "#5EEAD4"], // buttons, mascot flame glow, premium moments
+  wash: ["#12302B", "#0F211F"],    // subtle hero-card/backdrop wash, low contrast
+};
+```
+
+**Type scale:** `theme/typography.ts` exports `textStyles` (display/h1/h2/h3/body/bodyMedium/bodySmall/label/caption) — a standard scale components spread (`...textStyles.h2`) rather than hand-picking a `fontSize` per label.
+
+**Typography:** headings/mascot speech in Plus Jakarta Sans or General Sans (not the system default — reads unfinished); body text in Inter.
+
+**Shape & elevation:** 16–20px corner radius on cards, 12px on buttons. `shadows.card` is a plain black directional shadow (never colored) for the everyday "raised card" feel; `shadows.glow` is teal-tinted (`shadowColor: "#0F766E"`) and reserved for the 1-2 elements per screen allowed to feel "premium-glowing" (primary CTAs, the floating nav action) — same restraint rule as `accentGold`. Popups and the mascot card use a light frosted-glass blur treatment.
+
+**Discipline rule:** `accentGold` is the entire "premium" signal — if a future contributor reaches for it outside badges/streaks/level-ups/subscription, that's a design regression, not a valid choice. Flag it in review rather than letting it spread. (An earlier task-management detour added a named exception for a "Start Focus" button — that feature was removed in the product-direction reversal at §6a, so the exception no longer applies.)
+
+---
+
+## 3b. Frontend foundation & design direction (locked)
+
+The built Home screen is the visual baseline for the entire app — **do not redesign it**. Every future screen extends this same system; none of them switch to a different palette, corner radius, typography, mascot style, or button language. If a new screen would need to break this system, that's a decision to raise, not to make silently.
+
+**Product identity:** "Focus first. Gamification second." Prodify = a premium productivity app + a lightweight game + a friendly personal companion. It should never feel like a generic admin/SaaS dashboard, a childish edu-app, an overcomplicated RPG, or a social media app.
+
+**Design personality:** warm, encouraging, energetic, playful, premium, focused, friendly. Emotionally engaging without becoming visually noisy.
+
+**Avoid:** excessive glassmorphism, excessive neon, too many gradients, rainbow colors, sharp rectangular cards, tiny text, crowded dashboards, excessive animation. The UI should look polished even with no animation playing.
+
+**Color semantics (do not blur these):**
+- Gold (`accentGold`) = streak / XP / achievements / important progress — the "premium" signal (§3a discipline rule)
+- Teal (`primary` family) = navigation, interactive UI, primary surfaces, brand identity
+- `success` (soft green) = on-track states
+- `warning` (amber) = gentle nudges — e.g. streak-at-risk. Not the same token as `error`
+- `error` (muted red) = true error states only
+
+**Mascot state-reaction principle:** the mascot reacts to user state (session start → focused/supportive, session complete → proud/celebratory, streak milestone → excited, inactivity → welcoming, missed target → supportive, badge unlocked → proud presentation, level-up → celebration). It never shames — no "you failed / you wasted your day / you broke your streak" language, ever. This is why streak-at-risk uses `warning` (amber), not `error` (red), on the mascot message card.
+
+**Core UX principle:** every screen must answer "what can the user do next?" — the primary action should always be visually obvious. Don't fill a screen just to make it look complete; use whitespace intentionally.
+
+**Responsive targets:** mobile is the first-class target (proportions/spacing of the built Home screen are the reference), but the app must scale cleanly at 320/375/390/430/768/1024/1280/1440px+. Desktop adapts the same visual language into a more spacious layout — it does not just stretch the mobile design.
+
+**Design system discipline:** colors, typography, spacing, radius, shadow, and glow all come from `theme/` tokens (§3a) — components, buttons, cards, inputs, progress bars, badges, modals, nav, mascot containers, and toasts should all pull from the same tokens rather than hardcoding slightly different values per screen.
+
+---
+
 ## 4. Locked product decisions (do not re-decide these mid-build)
 
 - **No camera in sessions.** Presence is shown via avatars + status pulses, not video.
@@ -150,6 +223,9 @@ Build mock fixture data matching these shapes so Phase 2 is a clean swap:
 - **Session Room** → needs one mock `sessions` doc with a few fake `participants`
 - **Profile/Stats** → needs mock `users` doc + mock `pointsLedger` slice + mock `badges`
 - **Friends screen** → needs mock `friendships` array in various statuses
+- **Home / Sessions (Explore)** → needs mock `sessionCategories` (the 8 fixed themes) + mock `sessions` (live, multiplayer, with denormalized participant display names/avatars for the mock — see §6a)
+
+**§6a — product direction (locked, superseding an earlier detour):** an earlier architecture-doc pass took the app in a task-management direction (Tasks page, Focus timer, per-task XP) — that was fully built across a few iterations, then explicitly reversed: **Prodify is not a task-management app.** The core loop is live group-session discovery — themes (predefined by Prodify) containing user-created sessions (§1 §14) that people join in real time. All Tasks/Focus code, the `Task` type, and the `Tasks`/`Focus` nav items were removed. `Session`/`SessionCategory` (already in §5) are the real foundation now — `Session` gained additive UI fields (`name`, `description`, `isPublic`, `maxParticipants`, `participantCount`, and denormalized `displayName`/`avatarInitial` on participants) since Phase 1 has no `sessionTemplates` layer yet to resolve a session's display name through. If a future instruction reintroduces task-management framing, flag the conflict with this note before building — don't silently redo the detour.
 
 ---
 
