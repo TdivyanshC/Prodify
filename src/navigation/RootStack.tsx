@@ -1,5 +1,6 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { FriendProfileScreen } from '../screens/FriendProfileScreen';
+import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { PostSessionScreen } from '../screens/PostSessionScreen';
 import { SessionRoomScreen } from '../screens/SessionRoomScreen';
 import { RootNavigator } from './RootNavigator';
@@ -28,6 +29,11 @@ export function RootStack() {
       <Stack.Screen
         name="FriendProfile"
         component={FriendProfileScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name="Notifications"
+        component={NotificationsScreen}
         options={{ animation: 'slide_from_right' }}
       />
     </Stack.Navigator>

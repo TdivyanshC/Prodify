@@ -1,30 +1,80 @@
+import Feather from '@expo/vector-icons/Feather';
 import { useEffect, useRef } from 'react';
-import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { SessionParticipant } from '../../types/models';
-import { colors, fonts } from '../../theme';
+import { colors, fonts, radii } from '../../theme';
 
 interface ParticipantListProps {
   participants: SessionParticipant[];
   currentUserId: string;
+  // Whoever started the space — listed first and tagged, when present.
+  hostId?: string | null;
+  // Friends invited but not here yet — shown dimmed after everyone present.
+  invited?: { userId: string; displayName: string; avatarInitial: string }[];
+  // Renders a "+ Invite" control next to the heading when provided.
+  onInvite?: () => void;
 }
 
 // Architecture §4: presence shown via avatars + a status pulse, no camera,
 // no video tiles. The pulse just means "here and focused" — there's no
 // richer presence signal to show yet in Phase 1.
-export function ParticipantList({ participants, currentUserId }: ParticipantListProps) {
+export function ParticipantList({
+  participants,
+  currentUserId,
+  hostId,
+  invited = [],
+  onInvite,
+}: ParticipantListProps) {
+  const ordered = [
+    ...participants.filter((p) => p.userId === hostId),
+    ...participants.filter((p) => p.userId !== hostId),
+  ];
+
   return (
     <View style={styles.wrap}>
-      <Text style={styles.label}>IN THIS SESSION · {participants.length}</Text>
+      <View style={styles.headerRow}>
+        <Text style={styles.label}>IN THIS SESSION · {participants.length}</Text>
+        {onInvite ? (
+          <Pressable onPress={onInvite} hitSlop={8} style={styles.inviteButton} accessibilityLabel="Invite friends">
+            <Feather name="user-plus" size={13} color={colors.primaryLight} />
+            <Text style={styles.inviteLabel}>Invite</Text>
+          </Pressable>
+        ) : null}
+      </View>
       <View style={styles.grid}>
-        {participants.map((p) => (
-          <ParticipantChip key={p.userId} participant={p} isSelf={p.userId === currentUserId} />
+        {ordered.map((p) => (
+          <ParticipantChip
+            key={p.userId}
+            participant={p}
+            isSelf={p.userId === currentUserId}
+            isHost={p.userId === hostId}
+          />
+        ))}
+        {invited.map((p) => (
+          <View key={p.userId} style={[styles.chip, styles.chipInvited]}>
+            <View style={[styles.avatarCircle, styles.avatarCircleInvited]}>
+              <Text style={styles.avatarInitial}>{p.avatarInitial}</Text>
+            </View>
+            <Text style={styles.name} numberOfLines={1}>
+              {p.displayName.split(' ')[0]}
+            </Text>
+            <Text style={styles.invitedTag}>INVITED</Text>
+          </View>
         ))}
       </View>
     </View>
   );
 }
 
-function ParticipantChip({ participant, isSelf }: { participant: SessionParticipant; isSelf: boolean }) {
+function ParticipantChip({
+  participant,
+  isSelf,
+  isHost,
+}: {
+  participant: SessionParticipant;
+  isSelf: boolean;
+  isHost: boolean;
+}) {
   const pulse = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -55,8 +105,9 @@ function ParticipantChip({ participant, isSelf }: { participant: SessionParticip
         </View>
       </View>
       <Text style={styles.name} numberOfLines={1}>
-        {isSelf ? 'You' : participant.displayName}
+        {isSelf ? 'You' : participant.displayName.split(' ')[0]}
       </Text>
+      {isHost ? <Text style={styles.hostTag}>HOST</Text> : null}
     </View>
   );
 }
@@ -128,5 +179,48 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyMedium,
     fontSize: 11,
     color: colors.textSecondary,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  inviteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: radii.button,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  inviteLabel: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 12,
+    color: colors.primaryLight,
+  },
+  chipInvited: {
+    opacity: 0.55,
+  },
+  avatarCircleInvited: {
+    backgroundColor: colors.surface,
+    borderStyle: 'dashed',
+    borderColor: colors.borderStrong,
+  },
+  invitedTag: {
+    marginTop: -3,
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 9,
+    letterSpacing: 0.5,
+    color: colors.textSecondary,
+  },
+  hostTag: {
+    marginTop: -3,
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 9,
+    letterSpacing: 0.5,
+    color: colors.primaryLight,
   },
 });

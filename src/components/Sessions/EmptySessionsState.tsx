@@ -1,20 +1,24 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { Mascot } from '../Mascot/Mascot';
-import { colors, fonts, radii } from '../../theme';
+import { colors, fonts } from '../../theme';
+import { CreateSessionCard } from './CreateSessionCard';
 
 interface EmptySessionsStateProps {
-  onCreatePress: () => void;
+  onCreate: (name: string) => void;
 }
 
-// Architecture §1 §15: positive empty state with Spark, not a dead end.
-export function EmptySessionsState({ onCreatePress }: EmptySessionsStateProps) {
+// Architecture §1 §15: positive empty state with Spark, not a dead end —
+// same green-to-grey quick-create card as the suggestions grid, so
+// starting a session works identically whether the theme has live
+// sessions or not.
+export function EmptySessionsState({ onCreate }: EmptySessionsStateProps) {
   return (
     <View style={styles.container}>
       <Mascot variant="compact" messageOverride="No one's here yet 👀" />
       <Text style={styles.subtitle}>Be the first to start a session.</Text>
-      <Pressable onPress={onCreatePress} style={styles.button}>
-        <Text style={styles.buttonLabel}>+ Create Session</Text>
-      </Pressable>
+      <View style={styles.cardWrap}>
+        <CreateSessionCard onCreate={onCreate} />
+      </View>
     </View>
   );
 }
@@ -31,16 +35,8 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
   },
-  button: {
+  cardWrap: {
+    width: '100%',
     marginTop: 4,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    borderRadius: radii.button,
-    backgroundColor: colors.primary,
-  },
-  buttonLabel: {
-    fontFamily: fonts.bodySemiBold,
-    fontSize: 13,
-    color: colors.textPrimary,
   },
 });

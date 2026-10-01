@@ -6,6 +6,9 @@ import type { Friendship } from '../types/models';
 interface FriendsStoreState {
   friendships: Friendship[];
   isLoading: boolean;
+  // Distinguishes "not fetched yet" from "fetched, and the user has no
+  // friends" — `friendships.length === 0` can't tell those apart.
+  hasLoaded: boolean;
   refresh: () => Promise<void>;
   acceptRequest: (friendshipId: string) => void;
   declineRequest: (friendshipId: string) => void;
@@ -19,10 +22,11 @@ interface FriendsStoreState {
 export const useFriendsStore = create<FriendsStoreState>((set, get) => ({
   friendships: [],
   isLoading: false,
+  hasLoaded: false,
   refresh: async () => {
     set({ isLoading: true });
     const friendships = await getFriendships();
-    set({ friendships, isLoading: false });
+    set({ friendships, isLoading: false, hasLoaded: true });
   },
   acceptRequest: (friendshipId) =>
     set((state) => ({

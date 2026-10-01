@@ -17,6 +17,7 @@ export type MascotQuoteCategory =
   | 'missedTarget'
   | 'badgeEarned'
   | 'friendUpdate'
+  | 'friendsLive'
   | 'levelUp'
   | 'idle';
 
@@ -68,6 +69,12 @@ export const mascotQuotes: Record<MascotQuoteCategory, string[]> = {
   friendUpdate: [
     '{name} just finished a session.',
     "Your crew's been busy. Check out what they've been up to.",
+  ],
+  // {crew} is pre-built by the caller ("Riya is" / "3 of your friends
+  // are") so the grammar is right for one friend or many.
+  friendsLive: [
+    '{crew} focusing right now 👀\nWant to jump in with them?',
+    "Company makes the first minute easier. They're in Spaces.",
   ],
   levelUp: [
     "Level up! I can feel myself getting brighter.",

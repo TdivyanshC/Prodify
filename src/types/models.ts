@@ -65,6 +65,10 @@ export interface Session {
   durationTargetMin: number;
   status: 'scheduled' | 'active' | 'completed' | 'cancelled';
   participants: SessionParticipant[];
+  // Friends the host invited at creation (`POST /spaces` invitees in
+  // Phase 2) — people asked, not people present; they only show up in
+  // `participants` once they actually join.
+  invitedUserIds?: string[];
 }
 
 export interface Badge {

@@ -2,9 +2,10 @@ import Feather from '@expo/vector-icons/Feather';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Card } from '../components/Card/Card';
+import { ScreenBackground } from '../components/ScreenBackground/ScreenBackground';
 import { ParticipantList } from '../components/SessionRoom/ParticipantList';
 import { ReactionBar, type ReactionType } from '../components/SessionRoom/ReactionBar';
 import { mockSessionCategories } from '../mocks/sessionCategories.mock';
@@ -13,14 +14,14 @@ import { usePopupStore } from '../store/usePopupStore';
 import { useSessionStore } from '../store/useSessionStore';
 import { useUserStore } from '../store/useUserStore';
 import { colors, fonts, gradients, radii } from '../theme';
+import { useFriendsStore } from '../store/useFriendsStore';
+import { useTogetherStreakStore } from '../store/useTogetherStreakStore';
+import { useSpaceInviteStore } from '../store/useSpaceInviteStore';
+import { getAcceptedFriendIds, getFriendProfile, getOtherUserId } from '../utils/friendHelpers';
+import { InviteFriendsSheet } from '../components/SessionRoom/InviteFriendsSheet';
+import { formatClock, formatMinutes, getGroupFocusedMinutes } from '../utils/sessionHelpers';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SessionRoom'>;
-
-function formatClock(totalSeconds: number): string {
-  const m = Math.floor(totalSeconds / 60);
-  const s = totalSeconds % 60;
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-}
 
 // The actual core-loop screen (per this task's brief) — timer, target
 // progress, who else is here (avatars + status pulse, no camera per §4),
@@ -31,6 +32,11 @@ export function SessionRoomScreen({ route, navigation }: Props) {
   const session = useSessionStore((s) => s.sessions.find((sess) => sess._id === sessionId));
   const completeSession = useSessionStore((s) => s.completeSession);
   const recordSessionResult = useUserStore((s) => s.recordSessionResult);
+  const recordTogether = useTogetherStreakStore((s) => s.recordTogether);
+  const friendships = useFriendsStore((s) => s.friendships);
+  const addInvitees = useSessionStore((s) => s.addInvitees);
+  const sendInvites = useSpaceInviteStore((s) => s.sendInvites);
+  const [inviteSheetOpen, setInviteSheetOpen] = useState(false);
   const user = useUserStore((s) => s.user);
 
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -54,6 +60,7 @@ export function SessionRoomScreen({ route, navigation }: Props) {
   if (!session || !user) {
     return (
       <SafeAreaView style={styles.safeArea}>
+        <ScreenBackground />
         <View style={styles.missingWrap}>
           <Text style={styles.missingText}>This session has ended.</Text>
           <Pressable onPress={() => navigation.goBack()} style={styles.missingButton}>
@@ -68,10 +75,44 @@ export function SessionRoomScreen({ route, navigation }: Props) {
   const targetSeconds = session.durationTargetMin * 60;
   const progress = Math.min(1, elapsedSeconds / targetSeconds);
   const activeParticipants = session.participants.filter((p) => !p.leftAt);
+  // Friends-only spaces are the host's circle, so only the host can widen
+  // it; in a public space anyone can bring their own friends.
+  const canInvite = session.hostId === user._id || session.isPublic;
+  const alreadyAskedIds = new Set([
+    ...activeParticipants.map((p) => p.userId),
+    ...(session.invitedUserIds ?? []),
+  ]);
+  const invitableFriends = [...getAcceptedFriendIds(friendships, user._id)]
+    .filter((id) => !alreadyAskedIds.has(id))
+    .map((id) => getFriendProfile(id))
+    .filter((p): p is NonNullable<typeof p> => Boolean(p));
+  const handleSendInvites = (userIds: string[]) => {
+    addInvitees(session._id, userIds);
+    sendInvites(session._id, userIds);
+    setInviteSheetOpen(false);
+  };
+
+  // Re-derived every second alongside elapsedSeconds (the tick re-renders).
+  const groupMinutes = getGroupFocusedMinutes(session);
+  const peopleHere = Math.max(session.participantCount, activeParticipants.length);
+  const invitedNotHere = (session.invitedUserIds ?? [])
+    .filter((id) => !activeParticipants.some((p) => p.userId === id))
+    .map((id) => getFriendProfile(id))
+    .filter((p): p is NonNullable<typeof p> => Boolean(p))
+    .map((p) => ({ userId: p._id, displayName: p.displayName, avatarInitial: p.avatarInitial }));
 
   const finish = (targetHit: boolean) => {
     const completion = completeSession(session._id, targetHit);
     const outcome = recordSessionResult(completion);
+
+    // Together streaks follow the same bar as the main streak — only a
+    // streak-eligible session counts as a day focused together.
+    const friendIds = new Set(
+      friendships.filter((f) => f.status === 'accepted').map((f) => getOtherUserId(f, user._id))
+    );
+    const friendsHere = activeParticipants.filter((p) => friendIds.has(p.userId));
+    const togetherChanges = completion.streakEligible ? recordTogether(friendsHere.map((p) => p.userId)) : [];
+
     navigation.replace('PostSession', {
       sessionId: session._id,
       targetHit: completion.targetHit,
@@ -79,6 +120,11 @@ export function SessionRoomScreen({ route, navigation }: Props) {
       pointsEarned: outcome.pointsEarned,
       streakBefore: outcome.streakBefore,
       streakAfter: outcome.streakAfter,
+      togetherStreaks: togetherChanges.map((c) => ({
+        name: friendsHere.find((p) => p.userId === c.userId)?.displayName.split(' ')[0] ?? 'A friend',
+        days: c.after,
+        grew: c.after > c.before,
+      })),
     });
   };
 
@@ -102,6 +148,7 @@ export function SessionRoomScreen({ route, navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
+      <ScreenBackground />
       <View style={styles.topBar}>
         <Pressable
           onPress={handleLeavePress}
@@ -125,7 +172,7 @@ export function SessionRoomScreen({ route, navigation }: Props) {
         </View>
       </View>
 
-      <View style={styles.content}>
+      <ScrollView style={styles.contentScroll} contentContainerStyle={styles.content}>
         <Card style={styles.timerCard}>
           <LinearGradient
             colors={[colors.primaryDeep + '33', 'transparent']}
@@ -146,10 +193,26 @@ export function SessionRoomScreen({ route, navigation }: Props) {
               style={[styles.progressFill, { width: `${progress * 100}%` }]}
             />
           </View>
+
+          {peopleHere > 1 ? (
+            <View style={styles.groupRow}>
+              <Text style={styles.groupEmoji}>👥</Text>
+              <Text style={styles.groupText}>
+                Together: <Text style={styles.groupValue}>{formatMinutes(groupMinutes)}</Text> focused across{' '}
+                {peopleHere} people
+              </Text>
+            </View>
+          ) : null}
         </Card>
 
         <Card>
-          <ParticipantList participants={activeParticipants} currentUserId={user._id} />
+          <ParticipantList
+            participants={activeParticipants}
+            currentUserId={user._id}
+            hostId={session.hostId}
+            invited={invitedNotHere}
+            onInvite={canInvite ? () => setInviteSheetOpen(true) : undefined}
+          />
         </Card>
 
         <Card>
@@ -158,7 +221,7 @@ export function SessionRoomScreen({ route, navigation }: Props) {
             onReact={(type) => setReactionCounts((prev) => ({ ...prev, [type]: prev[type] + 1 }))}
           />
         </Card>
-      </View>
+      </ScrollView>
 
       <View style={styles.footer}>
         <Pressable onPress={handleComplete} style={styles.completeWrap}>
@@ -168,6 +231,13 @@ export function SessionRoomScreen({ route, navigation }: Props) {
           </LinearGradient>
         </Pressable>
       </View>
+
+      <InviteFriendsSheet
+        visible={inviteSheetOpen}
+        friends={invitableFriends}
+        onClose={() => setInviteSheetOpen(false)}
+        onSend={handleSendInvites}
+      />
     </SafeAreaView>
   );
 }
@@ -248,9 +318,12 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     color: colors.error,
   },
-  content: {
+  contentScroll: {
     flex: 1,
+  },
+  content: {
     paddingHorizontal: 20,
+    paddingBottom: 12,
     gap: 16,
   },
   timerCard: {
@@ -295,6 +368,29 @@ const styles = StyleSheet.create({
   progressFill: {
     height: '100%',
     borderRadius: 4,
+  },
+  groupRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    alignSelf: 'stretch',
+    justifyContent: 'center',
+    marginTop: 16,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  groupEmoji: {
+    fontSize: 15,
+  },
+  groupText: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
+  groupValue: {
+    fontFamily: fonts.headingBold,
+    color: colors.primaryLight,
   },
   footer: {
     paddingHorizontal: 20,

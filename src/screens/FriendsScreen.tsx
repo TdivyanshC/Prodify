@@ -9,6 +9,7 @@ import { EmptyFriendsState } from '../components/Friends/EmptyFriendsState';
 import { FriendCard } from '../components/Friends/FriendCard';
 import { FriendRequestRow } from '../components/Friends/FriendRequestRow';
 import { SuggestedFriendCard } from '../components/Friends/SuggestedFriendCard';
+import { ScreenBackground } from '../components/ScreenBackground/ScreenBackground';
 import { mockFriendProfiles } from '../mocks/friends.mock';
 import { DESKTOP_BREAKPOINT, type RootStackParamList } from '../navigation/routes';
 import { useFriendsStore } from '../store/useFriendsStore';
@@ -81,6 +82,7 @@ export function FriendsScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <ScreenBackground />
       <Header title="Friends" avatarInitial={user?.displayName?.[0]} />
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={[styles.inner, isDesktop && styles.innerDesktop]}>

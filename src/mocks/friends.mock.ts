@@ -46,7 +46,8 @@ export const mockFriendProfiles: FriendProfile[] = [
     tagline: 'Breathing through the chaos 🧘',
     favoriteCategoryIcon: '🧘',
     streak: { current: 3, longest: 9 },
-    isOnline: false,
+    // Online because he's hosting a live space (friendSpaces.mock.ts).
+    isOnline: true,
     mascotStage: 1,
   },
   {

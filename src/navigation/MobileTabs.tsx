@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { FriendsScreen } from '../screens/FriendsScreen';
 import { HomeScreen } from '../screens/HomeScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
-import { SessionsScreen } from '../screens/SessionsScreen';
+import { SpacesScreen } from '../screens/SpacesScreen';
 import { useCreateSessionModalStore } from '../store/useCreateSessionModalStore';
 import { CustomTabBar } from './CustomTabBar';
 import { MOBILE_TAB_ITEMS } from './routes';
@@ -12,7 +12,7 @@ const Tab = createBottomTabNavigator();
 
 const SCREEN_COMPONENTS = {
   Home: HomeScreen,
-  Sessions: SessionsScreen,
+  Spaces: SpacesScreen,
   Friends: FriendsScreen,
   Profile: ProfileScreen,
 };
@@ -24,7 +24,7 @@ function NoopScreen() {
   return <View />;
 }
 
-// Mobile nav (architecture §1 §10): Home / Sessions / Create / Friends /
+// Mobile nav (architecture §1 §10): Home / Spaces / Create / Friends /
 // Profile, rendered by CustomTabBar as a floating pill with Create
 // levitating above it. Each real screen renders its own Header, so the tab
 // navigator itself has none.

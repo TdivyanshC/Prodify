@@ -10,6 +10,7 @@ export type SparkEventKey =
   | 'xp_milestone'
   | 'inactivity'
   | 'friend_activity'
+  | 'friends_live'
   | 'returning'
   | 'regular';
 
@@ -24,6 +25,7 @@ export const SPARK_EVENT_QUOTE_CATEGORY: Record<SparkEventKey, MascotQuoteCatego
   xp_milestone: 'xpMilestone',
   inactivity: 'welcomeBack',
   friend_activity: 'friendUpdate',
+  friends_live: 'friendsLive',
   returning: 'returning',
   regular: 'regular',
 };
@@ -40,6 +42,7 @@ export const SPARK_EVENT_MOOD: Record<SparkEventKey, MascotMood> = {
   xp_milestone: 'proud',
   inactivity: 'sleepy',
   friend_activity: 'idle',
+  friends_live: 'excited',
   returning: 'excited',
   regular: 'proud',
 };

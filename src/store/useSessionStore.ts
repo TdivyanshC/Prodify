@@ -1,7 +1,8 @@
 import { create } from 'zustand';
+import { mockEndedFriendSpaces, mockFriendSpaces, mockScheduledFriendSpaces } from '../mocks/friendSpaces.mock';
 import { mockLiveSessions } from '../mocks/liveSessions.mock';
 import { mockUser } from '../mocks/user.mock';
-import type { Session } from '../types/models';
+import type { Session, SessionParticipant } from '../types/models';
 
 export interface CreateSessionInput {
   name: string;
@@ -9,6 +10,9 @@ export interface CreateSessionInput {
   durationMin: number;
   description?: string | null;
   isPublic: boolean;
+  invitedUserIds?: string[];
+  // A future time schedules the space instead of starting it now.
+  startTime?: string;
 }
 
 export interface CompleteSessionResult {
@@ -27,6 +31,10 @@ interface SessionStoreState {
   joinSession: (sessionId: string) => void;
   leaveSession: (sessionId: string) => void;
   createSession: (input: CreateSessionInput) => Session;
+  // Flips a scheduled space live: status → active, clock restarts now, and
+  // `host` (the person actually opening it) becomes the first participant.
+  startScheduledSpace: (sessionId: string, host: SessionParticipant) => void;
+  addInvitees: (sessionId: string, userIds: string[]) => void;
   completeSession: (sessionId: string, targetHit: boolean) => CompleteSessionResult;
 }
 
@@ -39,8 +47,14 @@ export const useSessionStore = create<SessionStoreState>((set, get) => ({
   isLoading: false,
   refresh: async () => {
     set({ isLoading: true });
-    // Phase 1: local fixture. Phase 2: GET /api/sessions?status=active.
-    set({ sessions: mockLiveSessions, isLoading: false });
+    // Phase 1: local fixtures. Phase 2: GET /api/spaces?status=active|scheduled
+    // plus recently completed ones. Friends' spaces live in the same list
+    // so Session Room can resolve any of them by id; every screen filters
+    // by `status` itself.
+    set({
+      sessions: [...mockFriendSpaces, ...mockScheduledFriendSpaces, ...mockEndedFriendSpaces, ...mockLiveSessions],
+      isLoading: false,
+    });
   },
   joinSession: (sessionId) =>
     set((state) => ({
@@ -84,6 +98,13 @@ export const useSessionStore = create<SessionStoreState>((set, get) => ({
       }),
     })),
   createSession: (input) => {
+    const now = new Date().toISOString();
+    // Scheduled spaces start empty — the host joins when they hit "Start
+    // now" (startScheduledSpace), not at creation, so no time is clocked
+    // before anyone is actually there.
+    const scheduledStart =
+      input.startTime && new Date(input.startTime).getTime() > Date.now() ? input.startTime : null;
+    const isScheduled = scheduledStart !== null;
     const newSession: Session = {
       _id: `session_${Date.now()}`,
       categoryId: input.categoryId,
@@ -92,28 +113,53 @@ export const useSessionStore = create<SessionStoreState>((set, get) => ({
       description: input.description ?? null,
       isPublic: input.isPublic,
       maxParticipants: null,
-      participantCount: 1,
+      participantCount: isScheduled ? 0 : 1,
       type: 'multiplayer',
       hostId: mockUser._id,
       isBotSeeded: false,
-      startTime: new Date().toISOString(),
+      startTime: scheduledStart ?? now,
       durationTargetMin: input.durationMin,
-      status: 'active',
-      participants: [
-        {
-          userId: mockUser._id,
-          joinedAt: new Date().toISOString(),
-          leftAt: null,
-          completed: false,
-          targetHit: false,
-          displayName: mockUser.displayName,
-          avatarInitial: mockUser.displayName[0],
-        },
-      ],
+      status: isScheduled ? 'scheduled' : 'active',
+      participants: isScheduled
+        ? []
+        : [
+            {
+              userId: mockUser._id,
+              joinedAt: now,
+              leftAt: null,
+              completed: false,
+              targetHit: false,
+              displayName: mockUser.displayName,
+              avatarInitial: mockUser.displayName[0],
+            },
+          ],
+      invitedUserIds: input.invitedUserIds ?? [],
     };
     set((state) => ({ sessions: [newSession, ...state.sessions] }));
     return newSession;
   },
+  startScheduledSpace: (sessionId, host) =>
+    set((state) => ({
+      sessions: state.sessions.map((session) => {
+        if (session._id !== sessionId || session.status !== 'scheduled') return session;
+        const now = new Date().toISOString();
+        return {
+          ...session,
+          status: 'active',
+          startTime: now,
+          participantCount: 1,
+          participants: [{ ...host, joinedAt: now, leftAt: null }],
+        };
+      }),
+    })),
+  addInvitees: (sessionId, userIds) =>
+    set((state) => ({
+      sessions: state.sessions.map((session) =>
+        session._id === sessionId
+          ? { ...session, invitedUserIds: [...new Set([...(session.invitedUserIds ?? []), ...userIds])] }
+          : session
+      ),
+    })),
   // Session Room's leave/complete controls both end the participant's
   // relationship to it and always mark leftAt — completion is just the
   // "targetHit: true" flavor. Returns minutes logged so the caller (Session

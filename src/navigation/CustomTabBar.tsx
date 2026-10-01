@@ -9,7 +9,7 @@ import { colors, fonts, gradients, radii, shadows } from '../theme';
 
 const TAB_META: Record<string, { icon: FeatherIconName; label: string }> = {
   Home: { icon: 'home', label: 'Home' },
-  Sessions: { icon: 'compass', label: 'Sessions' },
+  Spaces: { icon: 'compass', label: 'Spaces' },
   Friends: { icon: 'users', label: 'Friends' },
   Profile: { icon: 'user', label: 'Profile' },
 };

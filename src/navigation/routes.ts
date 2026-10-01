@@ -1,6 +1,6 @@
 import type { FeatherIconName } from '../components/icons/FeatherIconName';
 
-export type AppRouteName = 'Home' | 'Sessions' | 'Friends' | 'Progress' | 'Achievements' | 'Profile';
+export type AppRouteName = 'Home' | 'Spaces' | 'Friends' | 'Progress' | 'Achievements' | 'Profile';
 
 export interface NavItem {
   name: AppRouteName;
@@ -8,12 +8,12 @@ export interface NavItem {
   icon: FeatherIconName;
 }
 
-// Desktop sidebar (architecture §1 §10): Home / Sessions / Friends /
+// Desktop sidebar (architecture §1 §10): Home / Spaces / Friends /
 // Progress / Achievements / Profile. No "Tasks" item — Prodify is a
 // live-session-discovery product, not a task manager.
 export const NAV_ITEMS: NavItem[] = [
   { name: 'Home', label: 'Home', icon: 'home' },
-  { name: 'Sessions', label: 'Sessions', icon: 'compass' },
+  { name: 'Spaces', label: 'Spaces', icon: 'compass' },
   { name: 'Friends', label: 'Friends', icon: 'users' },
   { name: 'Progress', label: 'Progress', icon: 'bar-chart-2' },
   { name: 'Achievements', label: 'Achievements', icon: 'award' },
@@ -23,16 +23,16 @@ export const SIDEBAR_FOOTER_ITEMS: NavItem[] = [
   { name: 'Profile', label: 'Profile', icon: 'user' },
 ];
 
-// Mobile bottom nav (later architecture-doc pass, §1 §13): Home / Sessions
-// / Create / Friends / Profile — same "Sessions" label as desktop now
-// (an earlier pass called this tab "Explore" on mobile; superseded). The
+// Mobile bottom nav (later architecture-doc pass, §1 §13): Home / Spaces
+// / Create / Friends / Profile — same "Spaces" label as desktop (earlier
+// passes called this tab "Explore", then "Sessions"; both superseded). The
 // real "Create" tab is a special case registered directly in
 // MobileTabs.tsx (it intercepts tabPress to open the Create Session modal
 // instead of navigating to a screen), so it isn't listed here — this
 // array is only the 4 real routes.
 export const MOBILE_TAB_ITEMS: NavItem[] = [
   { name: 'Home', label: 'Home', icon: 'home' },
-  { name: 'Sessions', label: 'Sessions', icon: 'compass' },
+  { name: 'Spaces', label: 'Spaces', icon: 'compass' },
   { name: 'Friends', label: 'Friends', icon: 'users' },
   { name: 'Profile', label: 'Profile', icon: 'user' },
 ];
@@ -51,7 +51,10 @@ export const DESKTOP_BREAKPOINT = 768;
 // intentionally cover the tab bar, not another tab.
 export type RootStackParamList = {
   Auth: undefined;
-  Main: undefined;
+  // Optional nested target so root-level UI (toasts, the Notifications
+  // screen) can land on a specific tab: navigate('Main', { screen: 'Spaces' }).
+  Main: { screen: AppRouteName } | undefined;
+  Notifications: undefined;
   SessionRoom: { sessionId: string };
   // Session Room already calls completeSession/recordSessionResult before
   // navigating here, so Post-Session just displays the outcome it's
@@ -63,6 +66,9 @@ export type RootStackParamList = {
     pointsEarned: number;
     streakBefore: number;
     streakAfter: number;
+    // Together streaks this session advanced, one per friend who was in
+    // the space (omitted for solo/no-friend sessions).
+    togetherStreaks?: { name: string; days: number; grew: boolean }[];
   };
   // A drill-down from a Friends list row, not a CTA launch like SessionRoom/
   // PostSession — pushed as a normal (swipe-back-able) screen rather than a

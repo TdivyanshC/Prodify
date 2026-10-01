@@ -6,7 +6,7 @@ import { FriendsScreen } from '../screens/FriendsScreen';
 import { HomeScreen } from '../screens/HomeScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { ProgressScreen } from '../screens/ProgressScreen';
-import { SessionsScreen } from '../screens/SessionsScreen';
+import { SpacesScreen } from '../screens/SpacesScreen';
 import { colors } from '../theme';
 
 const Stack = createNativeStackNavigator();
@@ -21,7 +21,7 @@ export function DesktopShell() {
       <View style={styles.content}>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Home" component={HomeScreen} />
-          <Stack.Screen name="Sessions" component={SessionsScreen} />
+          <Stack.Screen name="Spaces" component={SpacesScreen} />
           <Stack.Screen name="Friends" component={FriendsScreen} />
           <Stack.Screen name="Progress" component={ProgressScreen} />
           <Stack.Screen name="Achievements" component={AchievementsScreen} />

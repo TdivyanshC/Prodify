@@ -1,12 +1,16 @@
 import Feather from '@expo/vector-icons/Feather';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatTile } from '../components/Profile/StatTile';
+import { ScreenBackground } from '../components/ScreenBackground/ScreenBackground';
 import type { RootStackParamList } from '../navigation/routes';
 import { useFriendsStore } from '../store/useFriendsStore';
 import { usePopupStore } from '../store/usePopupStore';
+import { useSpaceAlertsStore } from '../store/useSpaceAlertsStore';
+import { useTogetherStreakStore } from '../store/useTogetherStreakStore';
+import { getLiveTogetherStreak } from '../utils/togetherStreak';
 import { colors, fonts, gradients, radii } from '../theme';
 import { getFriendProfile } from '../utils/friendHelpers';
 
@@ -26,10 +30,14 @@ export function FriendProfileScreen({ route, navigation }: Props) {
   const friendship = useFriendsStore((s) => s.friendships.find((f) => f._id === friendshipId));
   const removeFriend = useFriendsStore((s) => s.removeFriend);
   const profile = getFriendProfile(userId);
+  const alertOn = useSpaceAlertsStore((s) => s.friendAlertIds.includes(userId));
+  const toggleFriendAlert = useSpaceAlertsStore((s) => s.toggleFriendAlert);
+  const togetherStreak = useTogetherStreakStore((s) => s.streaks[userId]);
 
   if (!friendship || !profile) {
     return (
       <SafeAreaView style={styles.safeArea}>
+        <ScreenBackground />
         <View style={styles.missingWrap}>
           <Text style={styles.missingText}>This friend couldn't be found.</Text>
           <Pressable onPress={() => navigation.goBack()} style={styles.missingButton}>
@@ -60,6 +68,7 @@ export function FriendProfileScreen({ route, navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
+      <ScreenBackground />
       <View style={styles.topBar}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={8} style={styles.backButton} accessibilityLabel="Back">
           <Feather name="arrow-left" size={19} color={colors.textSecondary} />
@@ -104,6 +113,25 @@ export function FriendProfileScreen({ route, navigation }: Props) {
         <View style={styles.statsGrid}>
           <StatTile emoji="🔥" value={profile.streak.current} label="Day streak" accent />
           <StatTile emoji="🏆" value={profile.streak.longest} label="Longest streak" accent />
+          <StatTile emoji="🤝" value={getLiveTogetherStreak(togetherStreak)} label="Together streak" accent />
+          <StatTile emoji="✨" value={togetherStreak?.longest ?? 0} label="Best together" accent />
+        </View>
+
+        <View style={styles.alertRow}>
+          <Feather name={alertOn ? 'bell' : 'bell-off'} size={17} color={alertOn ? colors.primaryLight : colors.textMuted} />
+          <View style={styles.alertText}>
+            <Text style={styles.alertTitle}>Space alerts</Text>
+            <Text style={styles.alertHint}>
+              Notify me when {profile.displayName.split(' ')[0]} starts a space
+            </Text>
+          </View>
+          <Switch
+            value={alertOn}
+            onValueChange={() => toggleFriendAlert(userId)}
+            trackColor={{ false: colors.surface, true: colors.primaryDeep }}
+            thumbColor={alertOn ? colors.primaryLight : colors.textSecondary}
+            accessibilityLabel={`Notify me when ${profile.displayName} starts a space`}
+          />
         </View>
 
         <Pressable onPress={handleUnfriend} style={styles.unfriendRow}>
@@ -301,6 +329,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
+  },
+  alertRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: radii.card,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  alertText: {
+    flex: 1,
+    gap: 1,
+  },
+  alertTitle: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 14,
+    color: colors.textPrimary,
+  },
+  alertHint: {
+    fontFamily: fonts.bodyRegular,
+    fontSize: 12.5,
+    color: colors.textSecondary,
   },
   unfriendRow: {
     flexDirection: 'row',

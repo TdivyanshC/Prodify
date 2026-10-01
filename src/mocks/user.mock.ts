@@ -15,6 +15,13 @@ export const mockUser: User = {
   },
   points: 1240,
   badgeIds: ['badge_streak_7', 'badge_early_bird'],
-  createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 40).toISOString(),
+  // Kept in sync with dailyActivity.mock's RANGE_MONTHS (4) so the Profile
+  // consistency heatmap never implies activity from before the account
+  // existed.
+  createdAt: (() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 4);
+    return d.toISOString();
+  })(),
   lastActiveAt: new Date(Date.now() - 1000 * 60 * 60 * 20).toISOString(),
 };

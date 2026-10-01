@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Card } from '../components/Card/Card';
 import { SuccessBadge } from '../components/PostSession/SuccessBadge';
+import { ScreenBackground } from '../components/ScreenBackground/ScreenBackground';
 import type { RootStackParamList } from '../navigation/routes';
 import { useSparkOverlayStore } from '../store/useSparkOverlayStore';
 import { colors, fonts, gradients, radii } from '../theme';
@@ -19,7 +20,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'PostSession'>;
 // quotes) rather than a bespoke mascot UI on this screen — it pops in on
 // arrival, and clearing it reveals the summary underneath.
 export function PostSessionScreen({ route, navigation }: Props) {
-  const { targetHit, minutesLogged, pointsEarned, streakBefore, streakAfter } = route.params;
+  const { targetHit, minutesLogged, pointsEarned, streakBefore, streakAfter, togetherStreaks = [] } = route.params;
   const showSpark = useSparkOverlayStore((s) => s.showSpark);
   const countedPoints = useCountUp(pointsEarned);
   const streakGrew = streakAfter > streakBefore;
@@ -38,6 +39,7 @@ export function PostSessionScreen({ route, navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <ScreenBackground />
       <View style={styles.content}>
         <SuccessBadge emoji={targetHit ? '🎉' : '🌱'} variant={targetHit ? 'celebrate' : 'grow'} />
         <Text style={styles.heading}>{targetHit ? 'Session complete' : 'Session logged'}</Text>
@@ -75,6 +77,16 @@ export function PostSessionScreen({ route, navigation }: Props) {
               {streakGrew ? <Text style={styles.streakDelta}>  +1 today</Text> : null}
             </Text>
           </View>
+
+          {togetherStreaks.map((t) => (
+            <View key={t.name} style={styles.togetherRow}>
+              <Text style={styles.streakEmoji}>🤝</Text>
+              <Text style={styles.streakText}>
+                <Text style={styles.streakValue}>{t.days}</Text>-day together streak with {t.name}
+                {t.grew ? <Text style={styles.streakDelta}>  +1 today</Text> : null}
+              </Text>
+            </View>
+          ))}
         </Card>
 
         <Pressable onPress={handleDone} style={styles.doneWrap}>
@@ -163,6 +175,13 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     borderTopWidth: 1,
     borderTopColor: colors.border,
+    gap: 8,
+  },
+  togetherRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
     gap: 8,
   },
   streakEmoji: {

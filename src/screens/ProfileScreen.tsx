@@ -4,11 +4,14 @@ import { useEffect } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Header } from '../components/AppShell/Header';
+import { ActivityHeatmap } from '../components/Profile/ActivityHeatmap';
 import { BadgesPreview } from '../components/Profile/BadgesPreview';
 import { ProfileHeaderCard } from '../components/Profile/ProfileHeaderCard';
 import { StatTile } from '../components/Profile/StatTile';
 import { WeeklyActivityChart } from '../components/Profile/WeeklyActivityChart';
+import { ScreenBackground } from '../components/ScreenBackground/ScreenBackground';
 import { mockBadges } from '../mocks/badges.mock';
+import { mockDailyActivity } from '../mocks/dailyActivity.mock';
 import { mockHomeStats } from '../mocks/homeStats.mock';
 import { mockWeeklyActivity } from '../mocks/weeklyActivity.mock';
 import { DESKTOP_BREAKPOINT } from '../navigation/routes';
@@ -37,6 +40,7 @@ export function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <ScreenBackground />
       <Header title="Profile" avatarInitial={user.displayName[0]} />
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={[styles.inner, isDesktop && styles.innerDesktop]}>
@@ -48,6 +52,8 @@ export function ProfileScreen() {
             <StatTile emoji="⚡" value={user.points} label="Total points" accent />
             <StatTile emoji="✅" value={mockHomeStats.sessionsCompletedTotal} label="Sessions done" />
           </View>
+
+          <ActivityHeatmap data={mockDailyActivity} targetMinutes={mockHomeStats.dailyTargetMinutes} />
 
           <WeeklyActivityChart data={mockWeeklyActivity} />
 

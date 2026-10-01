@@ -13,3 +13,7 @@ export function getOtherUserId(friendship: Friendship, myId: string = mockUser._
 export function getFriendProfile(userId: string): FriendProfile | undefined {
   return mockFriendProfiles.find((p) => p._id === userId);
 }
+
+export function getAcceptedFriendIds(friendships: Friendship[], myId: string = mockUser._id): Set<string> {
+  return new Set(friendships.filter((f) => f.status === 'accepted').map((f) => getOtherUserId(f, myId)));
+}

@@ -4,7 +4,7 @@ import { colors, fonts, radii } from '../../theme';
 
 export type ReactionType = 'clap' | 'fire' | 'fist_bump';
 
-const REACTION_META: Record<ReactionType, { emoji: string; label: string }> = {
+export const REACTION_META: Record<ReactionType, { emoji: string; label: string }> = {
   clap: { emoji: '👏', label: 'Clap' },
   fire: { emoji: '🔥', label: 'Fire' },
   fist_bump: { emoji: '🤜', label: 'Bump' },
