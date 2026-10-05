@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Card } from '../components/Card/Card';
 import { SuccessBadge } from '../components/PostSession/SuccessBadge';
+import { WhileYouFocused } from '../components/PostSession/WhileYouFocused';
 import { ScreenBackground } from '../components/ScreenBackground/ScreenBackground';
 import type { RootStackParamList } from '../navigation/routes';
 import { useSparkOverlayStore } from '../store/useSparkOverlayStore';
@@ -88,6 +89,12 @@ export function PostSessionScreen({ route, navigation }: Props) {
             </View>
           ))}
         </Card>
+
+        <WhileYouFocused
+          onSeeAll={() => {
+            navigation.reset({ index: 1, routes: [{ name: 'Main' }, { name: 'Notifications' }] });
+          }}
+        />
 
         <Pressable onPress={handleDone} style={styles.doneWrap}>
           <LinearGradient colors={gradients.primary} style={styles.doneButton}>

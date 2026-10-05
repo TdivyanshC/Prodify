@@ -14,7 +14,8 @@ export const mockUser: User = {
     freezesUsed: 2,
   },
   points: 1240,
-  badgeIds: ['badge_streak_7', 'badge_early_bird'],
+  // badge_xp_1000 because points (1240) already crossed that tier.
+  badgeIds: ['badge_streak_7', 'badge_early_bird', 'badge_xp_1000'],
   // Kept in sync with dailyActivity.mock's RANGE_MONTHS (4) so the Profile
   // consistency heatmap never implies activity from before the account
   // existed.

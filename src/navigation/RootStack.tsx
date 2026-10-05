@@ -1,6 +1,8 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { FriendProfileScreen } from '../screens/FriendProfileScreen';
+import { NotificationSettingsScreen } from '../screens/NotificationSettingsScreen';
 import { NotificationsScreen } from '../screens/NotificationsScreen';
+import { WeeklyRecapScreen } from '../screens/WeeklyRecapScreen';
 import { PostSessionScreen } from '../screens/PostSessionScreen';
 import { SessionRoomScreen } from '../screens/SessionRoomScreen';
 import { RootNavigator } from './RootNavigator';
@@ -35,6 +37,16 @@ export function RootStack() {
         name="Notifications"
         component={NotificationsScreen}
         options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name="NotificationSettings"
+        component={NotificationSettingsScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name="WeeklyRecap"
+        component={WeeklyRecapScreen}
+        options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
       />
     </Stack.Navigator>
   );

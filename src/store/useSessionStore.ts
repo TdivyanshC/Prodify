@@ -35,6 +35,8 @@ interface SessionStoreState {
   // `host` (the person actually opening it) becomes the first participant.
   startScheduledSpace: (sessionId: string, host: SessionParticipant) => void;
   addInvitees: (sessionId: string, userIds: string[]) => void;
+  // Someone other than the user joins (Phase 2: a presence socket event).
+  addParticipant: (sessionId: string, participant: SessionParticipant) => void;
   completeSession: (sessionId: string, targetHit: boolean) => CompleteSessionResult;
 }
 
@@ -151,6 +153,18 @@ export const useSessionStore = create<SessionStoreState>((set, get) => ({
           participants: [{ ...host, joinedAt: now, leftAt: null }],
         };
       }),
+    })),
+  addParticipant: (sessionId, participant) =>
+    set((state) => ({
+      sessions: state.sessions.map((session) =>
+        session._id !== sessionId || session.participants.some((p) => p.userId === participant.userId && !p.leftAt)
+          ? session
+          : {
+              ...session,
+              participantCount: session.participantCount + 1,
+              participants: [...session.participants, participant],
+            }
+      ),
     })),
   addInvitees: (sessionId, userIds) =>
     set((state) => ({

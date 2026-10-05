@@ -16,6 +16,7 @@ import { useUserStore } from '../store/useUserStore';
 import { colors, fonts, gradients, radii } from '../theme';
 import { useFriendsStore } from '../store/useFriendsStore';
 import { useTogetherStreakStore } from '../store/useTogetherStreakStore';
+import { useFocusModeStore } from '../store/useFocusModeStore';
 import { useSpaceInviteStore } from '../store/useSpaceInviteStore';
 import { getAcceptedFriendIds, getFriendProfile, getOtherUserId } from '../utils/friendHelpers';
 import { InviteFriendsSheet } from '../components/SessionRoom/InviteFriendsSheet';
@@ -37,6 +38,13 @@ export function SessionRoomScreen({ route, navigation }: Props) {
   const addInvitees = useSessionStore((s) => s.addInvitees);
   const sendInvites = useSpaceInviteStore((s) => s.sendInvites);
   const [inviteSheetOpen, setInviteSheetOpen] = useState(false);
+
+  // Focus mode for as long as the room is open: notifications are held
+  // back and shown together on Post-Session ("While you focused").
+  useEffect(() => {
+    useFocusModeStore.getState().enter(sessionId);
+    return () => useFocusModeStore.getState().exit();
+  }, [sessionId]);
   const user = useUserStore((s) => s.user);
 
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -102,6 +110,9 @@ export function SessionRoomScreen({ route, navigation }: Props) {
     .map((p) => ({ userId: p._id, displayName: p.displayName, avatarInitial: p.avatarInitial }));
 
   const finish = (targetHit: boolean) => {
+    // Exit before recording the result, so this session's own rewards
+    // (badge, level-up, freeze) toast right away instead of being held.
+    useFocusModeStore.getState().exit();
     const completion = completeSession(session._id, targetHit);
     const outcome = recordSessionResult(completion);
 

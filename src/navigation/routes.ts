@@ -55,6 +55,8 @@ export type RootStackParamList = {
   // screen) can land on a specific tab: navigate('Main', { screen: 'Spaces' }).
   Main: { screen: AppRouteName } | undefined;
   Notifications: undefined;
+  NotificationSettings: undefined;
+  WeeklyRecap: undefined;
   SessionRoom: { sessionId: string };
   // Session Room already calls completeSession/recordSessionResult before
   // navigating here, so Post-Session just displays the outcome it's

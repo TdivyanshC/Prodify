@@ -5,7 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { LoadingScreen } from './src/components/LoadingScreen/LoadingScreen';
 import { SparkOverlay } from './src/components/Mascot/SparkOverlay';
 import { NotificationToast } from './src/components/Notifications/NotificationToast';
-import { SpaceLifecycleRunner } from './src/components/Notifications/SpaceLifecycleRunner';
+import { NotificationRunner } from './src/components/Notifications/NotificationRunner';
 import { Popup } from './src/components/Popup/Popup';
 import { CreateSessionModal } from './src/components/Sessions/CreateSessionModal';
 import { ThemeDebugBadge } from './src/components/ThemeDebugBadge/ThemeDebugBadge';
@@ -48,7 +48,7 @@ export default function App() {
           {/* Same reason as CreateSessionModal: mounted once, and inside
               NavigationContainer because tapping a toast navigates. */}
           <NotificationToast />
-          <SpaceLifecycleRunner />
+          <NotificationRunner />
         </NavigationContainer>
         <SparkOverlay />
         <Popup />

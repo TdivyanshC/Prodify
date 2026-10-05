@@ -53,4 +53,31 @@ export const mockBadges: Badge[] = [
     criteriaValue: 10,
     icon: '🦋',
   },
+  // XP tiers — claude.md §4: badges at 1,000 / 5,000 / 10,000 total XP,
+  // awarded on threshold-cross. Names are the placeholders from
+  // docs/phase2-database-design.md §2.
+  {
+    _id: 'badge_xp_1000',
+    name: 'Rising Flame',
+    description: 'Earned 1,000 XP.',
+    criteriaType: 'total_xp',
+    criteriaValue: 1000,
+    icon: '🔥',
+  },
+  {
+    _id: 'badge_xp_5000',
+    name: 'Steady Blaze',
+    description: 'Earned 5,000 XP.',
+    criteriaType: 'total_xp',
+    criteriaValue: 5000,
+    icon: '☄️',
+  },
+  {
+    _id: 'badge_xp_10000',
+    name: 'Inferno',
+    description: 'Earned 10,000 XP.',
+    criteriaType: 'total_xp',
+    criteriaValue: 10000,
+    icon: '🌋',
+  },
 ];
