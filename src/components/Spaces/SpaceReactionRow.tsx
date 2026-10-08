@@ -19,7 +19,7 @@ export function SpaceReactionRow({ sessionId, toUserId, toFirstName }: SpaceReac
   // array every call makes zustand v5 re-render in a loop.
   const reactions = useReactionStore((s) => s.reactions);
   const sent = useMemo(
-    () => reactions.filter((r) => r.sessionId === sessionId && r.toUserId === toUserId).map((r) => r.type),
+    () => reactions.filter((r) => r.contextId === sessionId && r.toUserId === toUserId).map((r) => r.type),
     [reactions, sessionId, toUserId]
   );
   const toggleReaction = useReactionStore((s) => s.toggleReaction);

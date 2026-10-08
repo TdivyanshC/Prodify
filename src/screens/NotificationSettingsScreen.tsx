@@ -169,7 +169,7 @@ export function NotificationSettingsScreen({ navigation }: Props) {
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>PREVIEW (DEV ONLY)</Text>
               <Text style={styles.sectionHint}>
-                Send any notification now, with real fixture data. Skips quiet hours, limits, and focus mode.
+                Send any notification now through the server’s real pipeline. Skips quiet hours, limits, and focus mode.
               </Text>
               <View style={styles.previewGrid}>
                 {PREVIEW_TYPES.map(({ type, label }) => (

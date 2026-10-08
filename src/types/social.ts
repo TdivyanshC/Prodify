@@ -100,12 +100,18 @@ export interface NotificationPayload {
   level?: number;
   durationMin?: number;
   milestone?: number;
+  // The 🔥 reaction's context id for a friend's milestone (server-set).
+  milestoneContextId?: string;
   reactionEmoji?: string;
 }
 
 export interface AppNotification {
   _id: string;
   userId: string;
+  // Deterministic source-event id the server dedupes on.
+  eventId?: string;
+  actionTaken?: string | null;
+  delivery?: 'toast' | 'inbox' | 'held';
   type: AppNotificationType;
   category: NotificationCategory;
   title: string;
@@ -120,7 +126,7 @@ export interface AppNotification {
   payload: NotificationPayload;
   copyVariantId: string | null;
   // Notifications sharing a groupKey merge while unread (see
-  // utils/notifications/deliver.ts) instead of stacking up.
+  // the server's notification pipeline) instead of stacking up.
   groupKey?: string;
   scheduledAt: string;
   sentAt: string | null;

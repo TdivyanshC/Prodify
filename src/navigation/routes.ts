@@ -58,7 +58,7 @@ export type RootStackParamList = {
   NotificationSettings: undefined;
   WeeklyRecap: undefined;
   SessionRoom: { sessionId: string };
-  // Session Room already calls completeSession/recordSessionResult before
+  // Session Room has the server close the session (POST /spaces/:id/leave) before
   // navigating here, so Post-Session just displays the outcome it's
   // handed rather than re-deriving (or re-awarding) it.
   PostSession: {
@@ -77,4 +77,8 @@ export type RootStackParamList = {
   // full-screen modal. userId + friendshipId both travel along so the
   // screen never has to re-derive "which friendship is this" from scratch.
   FriendProfile: { friendshipId: string; userId: string };
+  // Progress / Achievements pushed over the tabs on mobile (the desktop
+  // sidebar has them as regular routes). Same components, back-bar variant.
+  ProgressPage: undefined;
+  AchievementsPage: undefined;
 };

@@ -5,7 +5,7 @@ import type { Session, SessionCategory } from '../../types/models';
 import { colors, fonts, gradients, radii } from '../../theme';
 import { getCategoryColor } from '../../theme/categoryColors';
 import { getFriendProfile } from '../../utils/friendHelpers';
-import { REMINDER_LEAD_MIN } from '../../utils/notifications/triggers/spaces';
+import { REMINDER_LEAD_MIN } from '../../utils/notifications/constants';
 import { Card } from '../Card/Card';
 
 interface ScheduledSpaceCardProps {

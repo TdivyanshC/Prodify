@@ -1,8 +1,13 @@
 import { useRef } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import type { DailyActivityEntry } from '../../mocks/dailyActivity.mock';
 import { colors, fonts, radii, shadows } from '../../theme';
 import { getDayStatus, type DayStatus } from '../../utils/activityHelpers';
+
+// One local day of the `userDailyTotal` rollup (GET /me/activity).
+export interface DailyActivityEntry {
+  date: string; // YYYY-MM-DD
+  totalMinutes: number;
+}
 
 interface ActivityHeatmapProps {
   data: DailyActivityEntry[];

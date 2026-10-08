@@ -18,13 +18,12 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { mockSessionCategories } from '../../mocks/sessionCategories.mock';
+import { useCatalogStore } from '../../store/useCatalogStore';
 import type { RootStackParamList } from '../../navigation/routes';
 import { useCreateSessionModalStore } from '../../store/useCreateSessionModalStore';
 import { useFriendsStore } from '../../store/useFriendsStore';
 import { usePopupStore } from '../../store/usePopupStore';
 import { useSessionStore } from '../../store/useSessionStore';
-import { useSpaceInviteStore } from '../../store/useSpaceInviteStore';
 import { colors, fonts, gradients, radii, shadows } from '../../theme';
 import type { FriendProfile } from '../../types/social';
 import { getFriendProfile, getOtherUserId } from '../../utils/friendHelpers';
@@ -69,7 +68,9 @@ export function CreateSessionModal() {
   const preset = useCreateSessionModalStore((s) => s.preset);
   const close = useCreateSessionModalStore((s) => s.close);
   const createSession = useSessionStore((s) => s.createSession);
-  const sendInvites = useSpaceInviteStore((s) => s.sendInvites);
+  const categories = useCatalogStore((s) => s.categories);
+  const defaultCategoryId = categories[0]?._id ?? 'cat_study';
+  const [creating, setCreating] = useState(false);
   const friendships = useFriendsStore((s) => s.friendships);
   const refreshFriends = useFriendsStore((s) => s.refresh);
   const insets = useSafeAreaInsets();
@@ -81,7 +82,7 @@ export function CreateSessionModal() {
   const themeCardWidth = (sheetWidth - 40 - THEME_GRID_GAP) / 2;
 
   const [step, setStep] = useState(0);
-  const [categoryId, setCategoryId] = useState(mockSessionCategories[0]._id);
+  const [categoryId, setCategoryId] = useState(defaultCategoryId);
   const [name, setName] = useState('');
   const [durationMin, setDurationMin] = useState(45);
   const [isPublic, setIsPublic] = useState(true);
@@ -105,7 +106,7 @@ export function CreateSessionModal() {
   useEffect(() => {
     if (visible) {
       setStep(0);
-      setCategoryId(preset?.categoryId ?? mockSessionCategories[0]._id);
+      setCategoryId(preset?.categoryId ?? defaultCategoryId);
       setName(preset?.name ?? '');
       setDurationMin(preset?.durationMin ?? 45);
       setIsPublic(true);
@@ -113,7 +114,7 @@ export function CreateSessionModal() {
       setStartSlot(null);
       setStartSlots(getUpcomingStartSlots());
       setMounted(true);
-      if (friendships.length === 0) refreshFriends();
+      if (friendships.length === 0) void refreshFriends().catch(() => undefined);
 
       stepAnim.setValue(0);
       translateY.setValue(windowHeight);
@@ -143,17 +144,28 @@ export function CreateSessionModal() {
     Animated.spring(stepAnim, { toValue: next, useNativeDriver: true, friction: 11, tension: 90 }).start();
   };
 
-  const handleCreate = () => {
-    const session = createSession({
-      name: name.trim(),
-      categoryId,
-      durationMin,
-      description: null,
-      isPublic,
-      invitedUserIds: invitedIds,
-      startTime: startSlot ?? undefined,
-    });
-    if (invitedIds.length > 0) sendInvites(session._id, invitedIds);
+  // Invitees go up with the create call — the server sends the invites.
+  const handleCreate = async () => {
+    if (creating) return;
+    setCreating(true);
+    let session;
+    try {
+      session = await createSession({
+        name: name.trim(),
+        categoryId,
+        durationMin,
+        description: null,
+        isPublic,
+        invitedUserIds: invitedIds,
+        startTime: startSlot ?? undefined,
+      });
+    } catch (err) {
+      const { showPopup, hidePopup } = usePopupStore.getState();
+      showPopup({ title: 'Couldn’t create the space', message: (err as Error).message, actions: [{ label: 'OK', onPress: hidePopup }] });
+      return;
+    } finally {
+      setCreating(false);
+    }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     close();
 
@@ -173,7 +185,7 @@ export function CreateSessionModal() {
 
   if (!mounted) return null;
 
-  const selectedCategory = mockSessionCategories.find((c) => c._id === categoryId);
+  const selectedCategory = categories.find((c) => c._id === categoryId);
   const endTimeLabel = formatEndTime(durationMin);
 
   return (
@@ -251,7 +263,7 @@ export function CreateSessionModal() {
 
                   <Text style={styles.fieldLabel}>Sessions</Text>
                   <View style={styles.themeGrid}>
-                    {mockSessionCategories.map((category) => (
+                    {categories.map((category) => (
                       <Pressable
                         key={category._id}
                         onPress={() => {

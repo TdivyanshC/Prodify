@@ -10,7 +10,7 @@ interface SessionCardProps {
   onStart: () => void;
 }
 
-// Placeholder session card for the Sessions tab rebuild — one clear
+// Compact session card (Home's "Your sessions") — one clear
 // action ("Start Session") rather than LiveSessionCard's fuller join/
 // leave/participant-preview treatment. Capsule look = a real border plus
 // the top of the locked 16-20px card radius range (radii.card), not a

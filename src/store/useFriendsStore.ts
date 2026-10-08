@@ -1,7 +1,8 @@
 import { create } from 'zustand';
-import { getFriendships } from '../services/friendService';
-import { mockUser } from '../mocks/user.mock';
+import * as friends from '../services/friendService';
 import type { Friendship } from '../types/models';
+import { usePeopleStore } from './usePeopleStore';
+import { useTogetherStreakStore } from './useTogetherStreakStore';
 
 interface FriendsStoreState {
   friendships: Friendship[];
@@ -10,51 +11,45 @@ interface FriendsStoreState {
   // friends" — `friendships.length === 0` can't tell those apart.
   hasLoaded: boolean;
   refresh: () => Promise<void>;
-  acceptRequest: (friendshipId: string) => void;
-  declineRequest: (friendshipId: string) => void;
-  sendRequest: (toUserId: string) => void;
-  removeFriend: (friendshipId: string) => void;
+  acceptRequest: (friendshipId: string) => Promise<void>;
+  declineRequest: (friendshipId: string) => Promise<void>;
+  sendRequest: (toUserId: string) => Promise<void>;
+  removeFriend: (friendshipId: string) => Promise<void>;
 }
 
 // Friends — claude.md §4: mutual accept required, either side can unfriend
-// anytime. All actions mutate this shared store (same pattern as
-// useSessionStore) so Friends screen state stays real rather than static UI.
+// anytime. The server owns the state machine (canonical pairs, blocks);
+// this store mirrors GET /friendships and refetches after each action.
 export const useFriendsStore = create<FriendsStoreState>((set, get) => ({
   friendships: [],
   isLoading: false,
   hasLoaded: false,
   refresh: async () => {
     set({ isLoading: true });
-    const friendships = await getFriendships();
-    set({ friendships, isLoading: false, hasLoaded: true });
+    try {
+      const res = await friends.getFriendships();
+      usePeopleStore.getState().upsert(res.profiles);
+      useTogetherStreakStore.getState().merge(res.togetherStreaks);
+      set({ friendships: res.friendships, hasLoaded: true });
+    } finally {
+      set({ isLoading: false });
+    }
   },
-  acceptRequest: (friendshipId) =>
-    set((state) => ({
-      friendships: state.friendships.map((f) =>
-        f._id === friendshipId ? { ...f, status: 'accepted' } : f
-      ),
-    })),
-  declineRequest: (friendshipId) =>
-    set((state) => ({
-      friendships: state.friendships.filter((f) => f._id !== friendshipId),
-    })),
-  sendRequest: (toUserId) => {
-    const alreadyExists = get().friendships.some(
-      (f) => f.userIdA === toUserId || f.userIdB === toUserId
-    );
-    if (alreadyExists) return;
-    const newFriendship: Friendship = {
-      _id: `friendship_${Date.now()}`,
-      userIdA: mockUser._id,
-      userIdB: toUserId,
-      status: 'pending',
-      requestedBy: mockUser._id,
-      createdAt: new Date().toISOString(),
-    };
-    set((state) => ({ friendships: [...state.friendships, newFriendship] }));
+  acceptRequest: async (friendshipId) => {
+    set((s) => ({ friendships: s.friendships.map((f) => (f._id === friendshipId ? { ...f, status: 'accepted' } : f)) }));
+    await friends.acceptFriendRequest(friendshipId).finally(() => get().refresh());
   },
-  removeFriend: (friendshipId) =>
-    set((state) => ({
-      friendships: state.friendships.filter((f) => f._id !== friendshipId),
-    })),
+  declineRequest: async (friendshipId) => {
+    set((s) => ({ friendships: s.friendships.filter((f) => f._id !== friendshipId) }));
+    await friends.declineFriendRequest(friendshipId).finally(() => get().refresh());
+  },
+  sendRequest: async (toUserId) => {
+    const { friendship, profile } = await friends.sendFriendRequest(toUserId);
+    usePeopleStore.getState().upsert([profile]);
+    set((s) => ({ friendships: [...s.friendships, friendship] }));
+  },
+  removeFriend: async (friendshipId) => {
+    set((s) => ({ friendships: s.friendships.filter((f) => f._id !== friendshipId) }));
+    await friends.removeFriendship(friendshipId).finally(() => get().refresh());
+  },
 }));

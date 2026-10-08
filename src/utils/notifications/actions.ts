@@ -1,5 +1,6 @@
 import type { NavigationProp } from '@react-navigation/native';
 import type { RootStackParamList } from '../../navigation/routes';
+import { recordNotificationAction } from '../../services/notificationService';
 import { useCreateSessionModalStore } from '../../store/useCreateSessionModalStore';
 import { useFriendsStore } from '../../store/useFriendsStore';
 import { useNotificationStore } from '../../store/useNotificationStore';
@@ -7,8 +8,6 @@ import { usePopupStore } from '../../store/usePopupStore';
 import { useReactionStore } from '../../store/useReactionStore';
 import { useSessionStore } from '../../store/useSessionStore';
 import { useSpaceAlertsStore } from '../../store/useSpaceAlertsStore';
-import { useSpaceInviteStore } from '../../store/useSpaceInviteStore';
-import { useUserStore } from '../../store/useUserStore';
 import type { AppNotification, NotificationAction } from '../../types/social';
 import { getFriendProfile } from '../friendHelpers';
 import { pickRandomLottie } from '../lottiePool';
@@ -18,10 +17,16 @@ type Nav = NavigationProp<RootStackParamList>;
 
 const SNOOZE_MINUTES = 10;
 
+// Finishes an action in place: rewrites the row locally and records it
+// server-side, so every device shows what happened.
+function resolveInPlace(notification: AppNotification, actionTaken: string, body: string) {
+  useNotificationStore.getState().update(notification._id, { body, actions: [] });
+  void recordNotificationAction(notification._id, actionTaken, body).catch(() => undefined);
+}
+
 // Runs one of a notification's action buttons. Shared by the toast and the
 // inbox rows. Every action marks the notification read and clears it from
-// the toast; actions that finish the job in place (remind, accept, send
-// fire) also rewrite the notification so the inbox shows what happened.
+// the toast.
 export function runNotificationAction(navigation: Nav, notification: AppNotification, action: NotificationAction) {
   const store = useNotificationStore.getState();
   store.markOpened(notification._id);
@@ -39,7 +44,7 @@ export function runNotificationAction(navigation: Nav, notification: AppNotifica
       if (!payload.spaceId) return;
       const alerts = useSpaceAlertsStore.getState();
       if (!alerts.reminderSpaceIds.includes(payload.spaceId)) alerts.toggleReminder(payload.spaceId);
-      return store.update(notification._id, { body: 'Reminder set ✓ We’ll ping you 5 minutes before.', actions: [] });
+      return resolveInPlace(notification, 'reminder_set', 'Reminder set ✓ We’ll ping you 5 minutes before.');
     }
     case 'quick_start':
       return useCreateSessionModalStore.getState().open({ durationMin: payload.durationMin });
@@ -47,22 +52,21 @@ export function runNotificationAction(navigation: Nav, notification: AppNotifica
       if (!payload.fromUserId) return;
       // Milestones aren't tied to a space, so the reaction is keyed to the
       // milestone itself — still one 🔥 per friend per milestone.
-      useReactionStore
-        .getState()
-        .toggleReaction(`milestone_${payload.fromUserId}_${payload.milestone ?? 0}`, payload.fromUserId, 'fire');
+      const contextId = payload.milestoneContextId ?? notification.eventId;
+      if (contextId) useReactionStore.getState().toggleReaction(contextId, payload.fromUserId, 'fire', 'milestone');
       const name = firstName(getFriendProfile(payload.fromUserId)?.displayName);
-      return store.update(notification._id, { body: `You sent 🔥 to ${name}.`, actions: [] });
+      return resolveInPlace(notification, 'sent_fire', `You sent 🔥 to ${name}.`);
     }
     case 'accept_friend': {
       if (!payload.friendshipId) return;
-      useFriendsStore.getState().acceptRequest(payload.friendshipId);
+      void useFriendsStore.getState().acceptRequest(payload.friendshipId).catch(() => undefined);
       const name = firstName(getFriendProfile(payload.fromUserId ?? '')?.displayName);
-      return store.update(notification._id, { body: `You and ${name} are accountability buddies now 🤝`, actions: [] });
+      return resolveInPlace(notification, 'accepted', `You and ${name} are accountability buddies now 🤝`);
     }
     case 'decline_friend':
       if (!payload.friendshipId) return;
-      useFriendsStore.getState().declineRequest(payload.friendshipId);
-      return store.update(notification._id, { body: 'Request declined.', actions: [] });
+      void useFriendsStore.getState().declineRequest(payload.friendshipId).catch(() => undefined);
+      return resolveInPlace(notification, 'declined', 'Request declined.');
     case 'open_recap':
       return navigation.navigate('WeeklyRecap');
     case 'celebrate': {
@@ -97,31 +101,28 @@ export function openNotification(navigation: Nav, notification: AppNotification)
   navigation.navigate('Main', { screen: 'Spaces' });
 }
 
+function showActionError(message: string) {
+  const { showPopup, hidePopup } = usePopupStore.getState();
+  showPopup({ title: 'Couldn’t do that', message, actions: [{ label: 'OK', onPress: hidePopup }] });
+}
+
 function joinSpace(navigation: Nav, spaceId: string | undefined) {
-  const space = useSessionStore.getState().sessions.find((s) => s._id === spaceId);
-  if (!space || space.status !== 'active') return navigation.navigate('Main', { screen: 'Spaces' });
-  useSessionStore.getState().joinSession(space._id);
-  const invite = useSpaceInviteStore
+  if (!spaceId) return navigation.navigate('Main', { screen: 'Spaces' });
+  useSessionStore
     .getState()
-    .invites.find((i) => i.spaceId === space._id && i.status === 'pending' && i.toUserId === useUserStore.getState().user?._id);
-  if (invite) useSpaceInviteStore.getState().acceptInvite(invite._id);
-  navigation.navigate('SessionRoom', { sessionId: space._id });
+    .joinSession(spaceId)
+    .then(() => navigation.navigate('SessionRoom', { sessionId: spaceId }))
+    .catch((err: Error) => {
+      navigation.navigate('Main', { screen: 'Spaces' });
+      showActionError(err.message);
+    });
 }
 
 function startOwnSpace(navigation: Nav, spaceId: string | undefined) {
-  const user = useUserStore.getState().user;
+  if (!spaceId) return navigation.navigate('Main', { screen: 'Spaces' });
   const space = useSessionStore.getState().sessions.find((s) => s._id === spaceId);
-  if (!user || !space) return navigation.navigate('Main', { screen: 'Spaces' });
-  if (space.status === 'scheduled') {
-    useSessionStore.getState().startScheduledSpace(space._id, {
-      userId: user._id,
-      joinedAt: new Date().toISOString(),
-      leftAt: null,
-      completed: false,
-      targetHit: false,
-      displayName: user.displayName,
-      avatarInitial: user.displayName[0],
-    });
-  }
-  navigation.navigate('SessionRoom', { sessionId: space._id });
+  const start = space?.status === 'scheduled' ? useSessionStore.getState().startScheduledSpace(spaceId) : Promise.resolve(space);
+  start
+    .then(() => navigation.navigate('SessionRoom', { sessionId: spaceId }))
+    .catch((err: Error) => showActionError(err.message));
 }

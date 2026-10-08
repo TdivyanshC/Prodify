@@ -3,7 +3,7 @@ import { Mascot } from '../Mascot/Mascot';
 import { colors, fonts } from '../../theme';
 
 // Positive empty state with Spark rather than a dead end, same treatment as
-// EmptySessionsState — shown only if mockUser has zero friends and zero
+// EmptySessionsState — shown only if the user has zero friends and zero
 // pending requests, since the "People you may know" section already gives
 // a next step right below it.
 export function EmptyFriendsState() {

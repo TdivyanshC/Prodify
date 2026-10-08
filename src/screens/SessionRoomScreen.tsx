@@ -8,17 +8,19 @@ import { Card } from '../components/Card/Card';
 import { ScreenBackground } from '../components/ScreenBackground/ScreenBackground';
 import { ParticipantList } from '../components/SessionRoom/ParticipantList';
 import { ReactionBar, type ReactionType } from '../components/SessionRoom/ReactionBar';
-import { mockSessionCategories } from '../mocks/sessionCategories.mock';
 import type { RootStackParamList } from '../navigation/routes';
 import { usePopupStore } from '../store/usePopupStore';
 import { useSessionStore } from '../store/useSessionStore';
+import { getCategory } from '../store/useCatalogStore';
+import { useNotificationStore } from '../store/useNotificationStore';
+import { useReactionStore } from '../store/useReactionStore';
+import { enterSpaceRoom, exitSpaceRoom } from '../api/realtime';
+import { getSpace } from '../services/spaceService';
 import { useUserStore } from '../store/useUserStore';
 import { colors, fonts, gradients, radii } from '../theme';
 import { useFriendsStore } from '../store/useFriendsStore';
-import { useTogetherStreakStore } from '../store/useTogetherStreakStore';
 import { useFocusModeStore } from '../store/useFocusModeStore';
-import { useSpaceInviteStore } from '../store/useSpaceInviteStore';
-import { getAcceptedFriendIds, getFriendProfile, getOtherUserId } from '../utils/friendHelpers';
+import { getAcceptedFriendIds, getFriendProfile } from '../utils/friendHelpers';
 import { InviteFriendsSheet } from '../components/SessionRoom/InviteFriendsSheet';
 import { formatClock, formatMinutes, getGroupFocusedMinutes } from '../utils/sessionHelpers';
 
@@ -31,28 +33,32 @@ type Props = NativeStackScreenProps<RootStackParamList, 'SessionRoom'>;
 export function SessionRoomScreen({ route, navigation }: Props) {
   const { sessionId } = route.params;
   const session = useSessionStore((s) => s.sessions.find((sess) => sess._id === sessionId));
-  const completeSession = useSessionStore((s) => s.completeSession);
-  const recordSessionResult = useUserStore((s) => s.recordSessionResult);
-  const recordTogether = useTogetherStreakStore((s) => s.recordTogether);
+  const leaveSession = useSessionStore((s) => s.leaveSession);
   const friendships = useFriendsStore((s) => s.friendships);
   const addInvitees = useSessionStore((s) => s.addInvitees);
-  const sendInvites = useSpaceInviteStore((s) => s.sendInvites);
   const [inviteSheetOpen, setInviteSheetOpen] = useState(false);
+  const [finishing, setFinishing] = useState(false);
 
-  // Focus mode for as long as the room is open: notifications are held
-  // back and shown together on Post-Session ("While you focused").
+  // Focus mode for as long as the room is open: the server holds
+  // notifications and returns them for Post-Session ("While you focused").
+  // The socket room carries live presence + reactions for this space.
   useEffect(() => {
     useFocusModeStore.getState().enter(sessionId);
-    return () => useFocusModeStore.getState().exit();
+    enterSpaceRoom(sessionId);
+    void useReactionStore.getState().loadRoomCounts(sessionId).catch(() => undefined);
+    return () => {
+      exitSpaceRoom(sessionId);
+      useFocusModeStore.getState().exit();
+    };
   }, [sessionId]);
+  // Opened from somewhere the feed didn't cover (e.g. a notification).
+  useEffect(() => {
+    if (!session) void getSpace(sessionId).then(useSessionStore.getState().upsert).catch(() => undefined);
+  }, [session, sessionId]);
   const user = useUserStore((s) => s.user);
 
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [reactionCounts, setReactionCounts] = useState<Record<ReactionType, number>>({
-    clap: 6,
-    fire: 11,
-    fist_bump: 2,
-  });
+  const reactionCounts = useReactionStore((s) => s.roomCounts[sessionId]) ?? { clap: 0, fire: 0, fist_bump: 0 };
 
   useEffect(() => {
     if (!session) return;
@@ -79,13 +85,14 @@ export function SessionRoomScreen({ route, navigation }: Props) {
     );
   }
 
-  const category = mockSessionCategories.find((c) => c._id === session.categoryId);
+  const category = getCategory(session.categoryId);
   const targetSeconds = session.durationTargetMin * 60;
   const progress = Math.min(1, elapsedSeconds / targetSeconds);
   const activeParticipants = session.participants.filter((p) => !p.leftAt);
   // Friends-only spaces are the host's circle, so only the host can widen
-  // it; in a public space anyone can bring their own friends.
-  const canInvite = session.hostId === user._id || session.isPublic;
+  // it; in a public space anyone can bring their own friends. The server
+  // computes this (and enforces it on the invite call).
+  const canInvite = session.viewer?.canInvite ?? session.hostId === user._id;
   const alreadyAskedIds = new Set([
     ...activeParticipants.map((p) => p.userId),
     ...(session.invitedUserIds ?? []),
@@ -95,9 +102,24 @@ export function SessionRoomScreen({ route, navigation }: Props) {
     .map((id) => getFriendProfile(id))
     .filter((p): p is NonNullable<typeof p> => Boolean(p));
   const handleSendInvites = (userIds: string[]) => {
-    addInvitees(session._id, userIds);
-    sendInvites(session._id, userIds);
     setInviteSheetOpen(false);
+    addInvitees(session._id, userIds).catch((err: Error) => showError(err.message));
+  };
+  // Cheers go to a person (fixed set, claude.md §4): the host, or — for the
+  // host — whoever has been here longest.
+  const cheerTarget = session.hostId && session.hostId !== user._id
+    ? session.hostId
+    : activeParticipants.find((p) => p.userId !== user._id)?.userId;
+  const handleReact = (type: ReactionType) => {
+    if (!cheerTarget) return;
+    const alreadySent = useReactionStore
+      .getState()
+      .reactions.some((r) => r.contextId === session._id && r.toUserId === cheerTarget && r.type === type && r.fromUserId === user._id);
+    useReactionStore.getState().toggleReaction(session._id, cheerTarget, type);
+    const delta = alreadySent ? -1 : 1;
+    useReactionStore.setState((s) => ({
+      roomCounts: { ...s.roomCounts, [session._id]: { ...reactionCounts, [type]: Math.max(0, reactionCounts[type] + delta) } },
+    }));
   };
 
   // Re-derived every second alongside elapsedSeconds (the tick re-renders).
@@ -109,40 +131,42 @@ export function SessionRoomScreen({ route, navigation }: Props) {
     .filter((p): p is NonNullable<typeof p> => Boolean(p))
     .map((p) => ({ userId: p._id, displayName: p.displayName, avatarInitial: p.avatarInitial }));
 
-  const finish = (targetHit: boolean) => {
-    // Exit before recording the result, so this session's own rewards
-    // (badge, level-up, freeze) toast right away instead of being held.
+  // The server closes the session (XP, streak, together streaks, badges)
+  // and returns the result; Post-Session just shows it.
+  const finish = async () => {
+    if (finishing) return;
+    setFinishing(true);
     useFocusModeStore.getState().exit();
-    const completion = completeSession(session._id, targetHit);
-    const outcome = recordSessionResult(completion);
-
-    // Together streaks follow the same bar as the main streak — only a
-    // streak-eligible session counts as a day focused together.
-    const friendIds = new Set(
-      friendships.filter((f) => f.status === 'accepted').map((f) => getOtherUserId(f, user._id))
-    );
-    const friendsHere = activeParticipants.filter((p) => friendIds.has(p.userId));
-    const togetherChanges = completion.streakEligible ? recordTogether(friendsHere.map((p) => p.userId)) : [];
-
-    navigation.replace('PostSession', {
-      sessionId: session._id,
-      targetHit: completion.targetHit,
-      minutesLogged: completion.minutesLogged,
-      pointsEarned: outcome.pointsEarned,
-      streakBefore: outcome.streakBefore,
-      streakAfter: outcome.streakAfter,
-      togetherStreaks: togetherChanges.map((c) => ({
-        name: friendsHere.find((p) => p.userId === c.userId)?.displayName.split(' ')[0] ?? 'A friend',
-        days: c.after,
-        grew: c.after > c.before,
-      })),
-    });
+    try {
+      const result = await leaveSession(session._id);
+      for (const n of result.heldNotifications) useNotificationStore.getState().upsert(n);
+      useFocusModeStore.getState().setLastHeld(result.heldNotifications.map((n) => n._id));
+      navigation.replace('PostSession', {
+        sessionId: session._id,
+        targetHit: result.session.targetHit,
+        minutesLogged: result.session.durationMin,
+        pointsEarned: result.session.xpEarned,
+        streakBefore: result.streak.before,
+        streakAfter: result.streak.after,
+        togetherStreaks: result.togetherStreaks.map((t) => ({ name: t.displayName, days: t.days, grew: t.grew })),
+      });
+    } catch (err) {
+      setFinishing(false);
+      useFocusModeStore.getState().enter(session._id);
+      showError((err as Error).message);
+    }
   };
+  const showError = (message: string) =>
+    usePopupStore.getState().showPopup({
+      title: 'Couldn’t reach Prodify',
+      message,
+      actions: [{ label: 'OK', onPress: () => usePopupStore.getState().hidePopup() }],
+    });
 
-  const handleComplete = () => finish(elapsedSeconds >= targetSeconds);
+  const handleComplete = () => void finish();
   const handleConfirmLeave = () => {
     usePopupStore.getState().hidePopup();
-    finish(false);
+    void finish();
   };
   const handleLeavePress = () => {
     usePopupStore.getState().showPopup({
@@ -229,7 +253,7 @@ export function SessionRoomScreen({ route, navigation }: Props) {
         <Card>
           <ReactionBar
             counts={reactionCounts}
-            onReact={(type) => setReactionCounts((prev) => ({ ...prev, [type]: prev[type] + 1 }))}
+            onReact={handleReact}
           />
         </Card>
       </ScrollView>
@@ -238,7 +262,7 @@ export function SessionRoomScreen({ route, navigation }: Props) {
         <Pressable onPress={handleComplete} style={styles.completeWrap}>
           <LinearGradient colors={gradients.primary} style={styles.completeButton}>
             <Feather name="flag" size={17} color={colors.textPrimary} />
-            <Text style={styles.completeLabel}>Complete session</Text>
+            <Text style={styles.completeLabel}>{finishing ? 'Saving…' : 'Complete session'}</Text>
           </LinearGradient>
         </Pressable>
       </View>

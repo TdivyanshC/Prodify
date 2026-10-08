@@ -1,8 +1,10 @@
 import { create } from 'zustand';
-import { mockEndedFriendSpaces, mockFriendSpaces, mockScheduledFriendSpaces } from '../mocks/friendSpaces.mock';
-import { mockLiveSessions } from '../mocks/liveSessions.mock';
-import { mockUser } from '../mocks/user.mock';
-import type { Session, SessionParticipant } from '../types/models';
+import type { SessionCloseResult } from '../api/types';
+import * as spaces from '../services/spaceService';
+import type { Session } from '../types/models';
+import { useSpaceAlertsStore } from './useSpaceAlertsStore';
+import { useSpaceInviteStore } from './useSpaceInviteStore';
+import { useTogetherStreakStore } from './useTogetherStreakStore';
 
 export interface CreateSessionInput {
   name: string;
@@ -15,187 +17,78 @@ export interface CreateSessionInput {
   startTime?: string;
 }
 
-export interface CompleteSessionResult {
-  targetHit: boolean;
-  minutesLogged: number;
-  // claude.md §4 streak rule: counts if the target was hit, OR the user
-  // stayed for at least half the target duration — computed here (where
-  // durationTargetMin is available) so callers never re-derive it.
-  streakEligible: boolean;
-}
-
 interface SessionStoreState {
+  // Every space the Spaces tab / Home / Session Room can show — friends' live,
+  // scheduled and recently ended ones, the user's own, public and seeded
+  // rooms (GET /spaces/feed). Screens filter by `status` themselves.
   sessions: Session[];
   isLoading: boolean;
+  hasLoaded: boolean;
   refresh: () => Promise<void>;
-  joinSession: (sessionId: string) => void;
-  leaveSession: (sessionId: string) => void;
-  createSession: (input: CreateSessionInput) => Session;
-  // Flips a scheduled space live: status → active, clock restarts now, and
-  // `host` (the person actually opening it) becomes the first participant.
-  startScheduledSpace: (sessionId: string, host: SessionParticipant) => void;
-  addInvitees: (sessionId: string, userIds: string[]) => void;
-  // Someone other than the user joins (Phase 2: a presence socket event).
-  addParticipant: (sessionId: string, participant: SessionParticipant) => void;
-  completeSession: (sessionId: string, targetHit: boolean) => CompleteSessionResult;
+  upsert: (space: Session) => void;
+  joinSession: (spaceId: string) => Promise<Session>;
+  // Ends the user's session in a space; the server closes it (XP, streak…)
+  // and returns the result Post-Session shows.
+  leaveSession: (spaceId: string) => Promise<SessionCloseResult>;
+  createSession: (input: CreateSessionInput) => Promise<Session>;
+  startScheduledSpace: (spaceId: string) => Promise<Session>;
+  addInvitees: (spaceId: string, userIds: string[]) => Promise<void>;
 }
 
-// Live sessions — architecture §1 §13: "interactions should actually
-// update frontend state," not fake static UI. Join/leave/create all
-// mutate this shared store so every screen reading it (Home, Sessions)
-// stays in sync.
+// Spaces state (CLAUDE.md §4 — the frontend rename to useSpaceStore is
+// still pending). Server-authoritative: every action awaits the API and
+// stores what it returns; socket `space:changed` triggers a refetch.
 export const useSessionStore = create<SessionStoreState>((set, get) => ({
   sessions: [],
   isLoading: false,
+  hasLoaded: false,
   refresh: async () => {
     set({ isLoading: true });
-    // Phase 1: local fixtures. Phase 2: GET /api/spaces?status=active|scheduled
-    // plus recently completed ones. Friends' spaces live in the same list
-    // so Session Room can resolve any of them by id; every screen filters
-    // by `status` itself.
-    set({
-      sessions: [...mockFriendSpaces, ...mockScheduledFriendSpaces, ...mockEndedFriendSpaces, ...mockLiveSessions],
-      isLoading: false,
-    });
+    try {
+      const feed = await spaces.getSpacesFeed();
+      set({ sessions: feed.spaces, hasLoaded: true });
+      useSpaceInviteStore.getState().setInvites(feed.invites);
+      useSpaceAlertsStore.getState().setAll(feed.friendAlertIds, feed.reminderSpaceIds);
+      useTogetherStreakStore.getState().merge(feed.togetherStreaks);
+    } finally {
+      set({ isLoading: false });
+    }
   },
-  joinSession: (sessionId) =>
+  upsert: (space) =>
     set((state) => ({
-      sessions: state.sessions.map((session) => {
-        if (session._id !== sessionId) return session;
-        const alreadyIn = session.participants.some(
-          (p) => p.userId === mockUser._id && !p.leftAt
-        );
-        if (alreadyIn) return session;
-        return {
-          ...session,
-          participantCount: session.participantCount + 1,
-          participants: [
-            ...session.participants,
-            {
-              userId: mockUser._id,
-              joinedAt: new Date().toISOString(),
-              leftAt: null,
-              completed: false,
-              targetHit: false,
-              displayName: mockUser.displayName,
-              avatarInitial: mockUser.displayName[0],
-            },
-          ],
-        };
-      }),
+      sessions: state.sessions.some((s) => s._id === space._id)
+        ? state.sessions.map((s) => (s._id === space._id ? space : s))
+        : [space, ...state.sessions],
     })),
-  leaveSession: (sessionId) =>
-    set((state) => ({
-      sessions: state.sessions.map((session) => {
-        if (session._id !== sessionId) return session;
-        const wasIn = session.participants.some((p) => p.userId === mockUser._id && !p.leftAt);
-        if (!wasIn) return session;
-        return {
-          ...session,
-          participantCount: Math.max(0, session.participantCount - 1),
-          participants: session.participants.map((p) =>
-            p.userId === mockUser._id ? { ...p, leftAt: new Date().toISOString() } : p
-          ),
-        };
-      }),
-    })),
-  createSession: (input) => {
-    const now = new Date().toISOString();
-    // Scheduled spaces start empty — the host joins when they hit "Start
-    // now" (startScheduledSpace), not at creation, so no time is clocked
-    // before anyone is actually there.
-    const scheduledStart =
-      input.startTime && new Date(input.startTime).getTime() > Date.now() ? input.startTime : null;
-    const isScheduled = scheduledStart !== null;
-    const newSession: Session = {
-      _id: `session_${Date.now()}`,
-      categoryId: input.categoryId,
-      templateId: null,
+  joinSession: async (spaceId) => {
+    const { space } = await spaces.joinSpace(spaceId);
+    get().upsert(space);
+    return space;
+  },
+  leaveSession: async (spaceId) => {
+    const result = await spaces.leaveSpace(spaceId);
+    void get().refresh();
+    return result;
+  },
+  createSession: async (input) => {
+    const { space } = await spaces.createSpace({
       name: input.name,
+      categoryId: input.categoryId,
+      durationTargetMin: input.durationMin,
       description: input.description ?? null,
       isPublic: input.isPublic,
-      maxParticipants: null,
-      participantCount: isScheduled ? 0 : 1,
-      type: 'multiplayer',
-      hostId: mockUser._id,
-      isBotSeeded: false,
-      startTime: scheduledStart ?? now,
-      durationTargetMin: input.durationMin,
-      status: isScheduled ? 'scheduled' : 'active',
-      participants: isScheduled
-        ? []
-        : [
-            {
-              userId: mockUser._id,
-              joinedAt: now,
-              leftAt: null,
-              completed: false,
-              targetHit: false,
-              displayName: mockUser.displayName,
-              avatarInitial: mockUser.displayName[0],
-            },
-          ],
-      invitedUserIds: input.invitedUserIds ?? [],
-    };
-    set((state) => ({ sessions: [newSession, ...state.sessions] }));
-    return newSession;
+      invitedUserIds: input.invitedUserIds,
+      startTime: input.startTime,
+    });
+    get().upsert(space);
+    return space;
   },
-  startScheduledSpace: (sessionId, host) =>
-    set((state) => ({
-      sessions: state.sessions.map((session) => {
-        if (session._id !== sessionId || session.status !== 'scheduled') return session;
-        const now = new Date().toISOString();
-        return {
-          ...session,
-          status: 'active',
-          startTime: now,
-          participantCount: 1,
-          participants: [{ ...host, joinedAt: now, leftAt: null }],
-        };
-      }),
-    })),
-  addParticipant: (sessionId, participant) =>
-    set((state) => ({
-      sessions: state.sessions.map((session) =>
-        session._id !== sessionId || session.participants.some((p) => p.userId === participant.userId && !p.leftAt)
-          ? session
-          : {
-              ...session,
-              participantCount: session.participantCount + 1,
-              participants: [...session.participants, participant],
-            }
-      ),
-    })),
-  addInvitees: (sessionId, userIds) =>
-    set((state) => ({
-      sessions: state.sessions.map((session) =>
-        session._id === sessionId
-          ? { ...session, invitedUserIds: [...new Set([...(session.invitedUserIds ?? []), ...userIds])] }
-          : session
-      ),
-    })),
-  // Session Room's leave/complete controls both end the participant's
-  // relationship to it and always mark leftAt — completion is just the
-  // "targetHit: true" flavor. Returns minutes logged so the caller (Session
-  // Room) can pass streak-eligibility on to the Post-Session screen without
-  // re-deriving it from a session that's already been mutated.
-  completeSession: (sessionId, targetHit) => {
-    const now = new Date().toISOString();
-    let minutesLogged = 0;
-    let streakEligible = targetHit;
-    set((state) => ({
-      sessions: state.sessions.map((session) => {
-        if (session._id !== sessionId) return session;
-        minutesLogged = Math.round((Date.now() - new Date(session.startTime).getTime()) / 60000);
-        streakEligible = targetHit || minutesLogged >= session.durationTargetMin * 0.5;
-        return {
-          ...session,
-          participants: session.participants.map((p) =>
-            p.userId === mockUser._id ? { ...p, leftAt: now, completed: true, targetHit } : p
-          ),
-        };
-      }),
-    }));
-    return { targetHit, minutesLogged, streakEligible };
+  startScheduledSpace: async (spaceId) => {
+    const { space } = await spaces.startSpace(spaceId);
+    get().upsert(space);
+    return space;
+  },
+  addInvitees: async (spaceId, userIds) => {
+    get().upsert(await spaces.inviteToSpace(spaceId, userIds));
   },
 }));

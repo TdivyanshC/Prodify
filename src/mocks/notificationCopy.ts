@@ -125,7 +125,7 @@ export const GROUPED_COPY: Partial<Record<AppNotificationType, CopyVariant>> = {
 };
 
 // ── Playful "come focus" nudges — the Swiggy/Zomato-style hooks ─────────
-// Picked by context (see utils/notifications/triggers/nudges.ts):
+// Picked by context server-side (server/src/jobs/index.ts nudgeUser):
 // a friend live right now beats a streak hook beats a time-of-day line.
 export type NudgeContext = 'friend_live' | 'streak' | 'theme' | 'morning' | 'afternoon' | 'evening' | 'late_night';
 

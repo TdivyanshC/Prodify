@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { getNextMascotMessage, MascotMessage } from '../services/mascotService';
+import { getNextMascotMessage, markMascotEventDelivered, type MascotMessage } from '../services/mascotService';
 
 interface MascotStoreState {
   message: MascotMessage | null;
@@ -7,12 +7,19 @@ interface MascotStoreState {
   refresh: () => Promise<void>;
 }
 
+// Spark's card message — the server picks which queued event wins (CLAUDE.md
+// §4 priority order); once shown, it's marked delivered so it isn't repeated.
 export const useMascotStore = create<MascotStoreState>((set) => ({
   message: null,
   isLoading: false,
   refresh: async () => {
     set({ isLoading: true });
-    const message = await getNextMascotMessage();
-    set({ message, isLoading: false });
+    try {
+      const message = await getNextMascotMessage();
+      set({ message });
+      if (message.event) void markMascotEventDelivered(message.event._id).catch(() => undefined);
+    } finally {
+      set({ isLoading: false });
+    }
   },
 }));

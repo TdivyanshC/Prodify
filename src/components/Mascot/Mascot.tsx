@@ -2,6 +2,7 @@ import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useRef } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import { getAuthToken } from '../../api/client';
 import { useMascotStore } from '../../store/useMascotStore';
 import { colors, fonts, gradients, radii, shadows } from '../../theme';
 import { useReducedMotion } from '../../utils/useReducedMotion';
@@ -49,8 +50,8 @@ interface MascotProps {
 }
 
 // Mascot presence: static rendered mascot image + a message, either the
-// mock priority logic's current pick (mascotService, claude.md §4) or a
-// caller-supplied override. The image is an offline render of the real 3D
+// server's current pick (GET /mascot/next — priority order in claude.md §4)
+// or a caller-supplied override. The image is an offline render of the real 3D
 // mascot asset (not yet a Lottie/animated asset) — swap for a proper
 // idle-loop animation once one exists.
 //
@@ -64,11 +65,13 @@ export function Mascot({ variant = 'full', messageOverride, mood = 'idle' }: Mas
   const isLoading = useMascotStore((state) => state.isLoading);
   const refresh = useMascotStore((state) => state.refresh);
 
+  // Only ask the server when this card shows its pick (no override) and
+  // someone is signed in — the sign-in screen renders Spark too.
   useEffect(() => {
-    if (!message) {
-      refresh();
+    if (!message && !messageOverride && getAuthToken()) {
+      refresh().catch(() => undefined);
     }
-  }, [message, refresh]);
+  }, [message, messageOverride, refresh]);
 
   const isStreakAtRisk = useMemo(() => message?.eventType === 'streak_at_risk', [
     message?.eventType,
@@ -248,9 +251,8 @@ function ConfettiBurst() {
   );
 }
 
-// Lightweight shimmer standing in for the message text while it resolves.
-// Mock data resolves instantly today, but Phase 2 replaces mascotService
-// with a real network call, so this path needs to already be correct.
+// Lightweight shimmer standing in for the message text while the API call
+// for Spark's next message resolves.
 function MascotMessageSkeleton({ compact }: { compact: boolean }) {
   const shimmer = useRef(new Animated.Value(0)).current;
 

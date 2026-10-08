@@ -1,28 +1,23 @@
 import { create } from 'zustand';
+import * as api from '../services/notificationService';
 import type { AppNotification } from '../types/social';
 
-interface Snoozed {
-  notification: AppNotification;
-  until: number;
-}
+type Delivery = 'toast' | 'inbox' | 'held';
 
 interface NotificationStoreState {
   notifications: AppNotification[];
-  // Source-event ids already handled. A grouped notification keeps the id
-  // of whichever event started the group, so the events it absorbed need
-  // their own record — otherwise the next trigger pass would re-send them.
-  seenEventIds: string[];
   // Toasts show one at a time: `toastId` is on screen, `toastQueue` waits.
   toastId: string | null;
   toastQueue: string[];
-  // When each toast was shown — the daily cap counts today's entries.
-  toastLog: number[];
-  snoozed: Snoozed[];
 
-  hasSeen: (eventId: string) => boolean;
-  markSeen: (eventId: string) => void;
+  load: () => Promise<void>;
+  // A server push (`notification:new`). The server already decided whether
+  // it interrupts — dedupe, grouping, quiet hours, cap, focus mode all live
+  // in its pipeline (backend doc §8.1).
+  receive: (notification: AppNotification, delivery: Delivery) => void;
   // Inserts, or replaces in place (moved to the top) when the id exists.
   upsert: (notification: AppNotification) => void;
+  // Local edit only — e.g. an in-place action rewriting the row's body.
   update: (id: string, patch: Partial<AppNotification>) => void;
   enqueueToast: (id: string) => void;
   dismissToast: () => void;
@@ -30,26 +25,23 @@ interface NotificationStoreState {
   markAllOpened: () => void;
   remove: (id: string) => void;
   snooze: (id: string, minutes: number) => void;
-  takeDueSnoozes: (now: number) => AppNotification[];
 }
 
-// In-app notification inbox + toast queue. Phase 2 swaps the trigger side
-// for the `notification:new` socket event and `markOpened` for
-// PATCH /notifications/:id/read (docs/phase2-backend-architecture.md);
-// what decides *whether* something toasts lives in
-// utils/notifications/deliver.ts, not here.
+// In-app inbox + toast queue, mirroring GET /notifications and the
+// `notification:new` socket event. Writes go straight to the API.
 export const useNotificationStore = create<NotificationStoreState>((set, get) => ({
   notifications: [],
-  seenEventIds: [],
   toastId: null,
   toastQueue: [],
-  toastLog: [],
-  snoozed: [],
 
-  hasSeen: (eventId) => get().seenEventIds.includes(eventId),
-  markSeen: (eventId) =>
-    set((state) => (state.seenEventIds.includes(eventId) ? state : { seenEventIds: [...state.seenEventIds, eventId] })),
-
+  load: async () => {
+    const { items } = await api.getNotifications();
+    set({ notifications: items });
+  },
+  receive: (notification, delivery) => {
+    get().upsert(notification);
+    if (delivery === 'toast') get().enqueueToast(notification._id);
+  },
   upsert: (notification) =>
     set((state) => ({
       notifications: [notification, ...state.notifications.filter((n) => n._id !== notification._id)],
@@ -60,8 +52,7 @@ export const useNotificationStore = create<NotificationStoreState>((set, get) =>
   enqueueToast: (id) =>
     set((state) => {
       if (state.toastId === id || state.toastQueue.includes(id)) return state;
-      const toastLog = [...state.toastLog, Date.now()];
-      return state.toastId === null ? { toastId: id, toastLog } : { toastQueue: [...state.toastQueue, id], toastLog };
+      return state.toastId === null ? { toastId: id } : { toastQueue: [...state.toastQueue, id] };
     }),
   dismissToast: () =>
     set((state) => {
@@ -69,37 +60,32 @@ export const useNotificationStore = create<NotificationStoreState>((set, get) =>
       return { toastId: next ?? null, toastQueue: rest };
     }),
 
-  markOpened: (id) =>
-    set((state) => ({
-      notifications: state.notifications.map((n) =>
-        n._id === id && !n.openedAt ? { ...n, openedAt: new Date().toISOString() } : n
-      ),
-    })),
+  markOpened: (id) => {
+    const target = get().notifications.find((n) => n._id === id);
+    if (!target || target.openedAt) return;
+    get().update(id, { openedAt: new Date().toISOString() });
+    void api.markNotificationOpened(id).catch(() => undefined);
+  },
   markAllOpened: () => {
     const now = new Date().toISOString();
     set((state) => ({ notifications: state.notifications.map((n) => (n.openedAt ? n : { ...n, openedAt: now })) }));
+    void api.markAllNotificationsOpened().catch(() => undefined);
   },
-  remove: (id) =>
+  remove: (id) => {
     set((state) => {
       const queue = state.toastQueue.filter((q) => q !== id);
       const removingCurrent = state.toastId === id;
       return {
         notifications: state.notifications.filter((n) => n._id !== id),
-        toastId: removingCurrent ? queue[0] ?? null : state.toastId,
+        toastId: removingCurrent ? (queue[0] ?? null) : state.toastId,
         toastQueue: removingCurrent ? queue.slice(1) : queue,
       };
-    }),
-
-  snooze: (id, minutes) => {
-    const notification = get().notifications.find((n) => n._id === id);
-    if (!notification) return;
-    get().markOpened(id);
-    set((state) => ({ snoozed: [...state.snoozed, { notification, until: Date.now() + minutes * 60000 }] }));
+    });
+    void api.deleteNotification(id).catch(() => undefined);
   },
-  takeDueSnoozes: (now) => {
-    const due = get().snoozed.filter((s) => s.until <= now);
-    if (due.length === 0) return [];
-    set((state) => ({ snoozed: state.snoozed.filter((s) => s.until > now) }));
-    return due.map((s) => s.notification);
+  // The server re-delivers it after `minutes` (high priority, same words).
+  snooze: (id, minutes) => {
+    get().update(id, { openedAt: new Date().toISOString() });
+    void api.snoozeNotification(id, minutes).catch(() => undefined);
   },
 }));

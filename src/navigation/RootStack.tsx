@@ -1,5 +1,7 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { AchievementsScreen } from '../screens/AchievementsScreen';
 import { FriendProfileScreen } from '../screens/FriendProfileScreen';
+import { ProgressScreen } from '../screens/ProgressScreen';
 import { NotificationSettingsScreen } from '../screens/NotificationSettingsScreen';
 import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { WeeklyRecapScreen } from '../screens/WeeklyRecapScreen';
@@ -33,6 +35,8 @@ export function RootStack() {
         component={FriendProfileScreen}
         options={{ animation: 'slide_from_right' }}
       />
+      <Stack.Screen name="ProgressPage" component={ProgressScreen} options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="AchievementsPage" component={AchievementsScreen} options={{ animation: 'slide_from_right' }} />
       <Stack.Screen
         name="Notifications"
         component={NotificationsScreen}

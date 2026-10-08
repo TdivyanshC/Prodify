@@ -57,7 +57,7 @@ export function FriendProfileScreen({ route, navigation }: Props) {
         {
           label: 'Unfriend',
           onPress: () => {
-            removeFriend(friendshipId);
+            void removeFriend(friendshipId).catch(() => undefined);
             usePopupStore.getState().hidePopup();
             navigation.goBack();
           },
@@ -96,7 +96,7 @@ export function FriendProfileScreen({ route, navigation }: Props) {
 
           <Text style={styles.name}>{profile.displayName}</Text>
           <Text style={styles.tagline}>{profile.tagline}</Text>
-          <Text style={styles.friendsSince}>Friends since {formatFriendsSince(friendship.createdAt)}</Text>
+          <Text style={styles.friendsSince}>Friends since {formatFriendsSince(friendship.respondedAt ?? friendship.createdAt)}</Text>
 
           <View style={styles.pillRow}>
             <View style={styles.mascotPill}>

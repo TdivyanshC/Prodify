@@ -1,0 +1,38 @@
+{
+  "name": "@prodify/server",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Prodify Phase 2 backend. Only the dev seed exists so far; see docs/phase2-backend-architecture.md.",
+  "scripts": {
+    "dev": "tsx watch --clear-screen=false src/server.ts",
+    "start": "tsx src/server.ts",
+    "test": "tsx src/tests/api.test.ts && tsx src/tests/auth.test.ts",
+    "test:auth": "tsx src/tests/auth.test.ts",
+    "seed": "tsx src/seed/run.ts",
+    "seed:check": "tsx src/seed/check.ts",
+    "seed:dump": "tsx src/seed/dump.ts",
+    "seed:verify": "tsx src/seed/verifyMongo.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "helmet": "^8.3.0",
+    "jose": "^6.2.12",
+    "mongodb": "^6.21.0",
+    "pino": "^10.4.0",
+    "socket.io": "^4.8.4",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.4",
+    "mongodb-memory-server": "^11.3.0",
+    "pino-pretty": "^13.2.0",
+    "socket.io-client": "^4.8.4",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.3"
+  }
+}

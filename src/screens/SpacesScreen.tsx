@@ -13,12 +13,12 @@ import { LiveSessionCard } from '../components/Sessions/LiveSessionCard';
 import { EndedSpaceRow } from '../components/Spaces/EndedSpaceRow';
 import { FriendSpaceCard } from '../components/Spaces/FriendSpaceCard';
 import { ScheduledSpaceCard } from '../components/Spaces/ScheduledSpaceCard';
-import { mockSessionCategories } from '../mocks/sessionCategories.mock';
 import { DESKTOP_BREAKPOINT, type RootStackParamList } from '../navigation/routes';
 import { useCreateSessionModalStore } from '../store/useCreateSessionModalStore';
 import { useFriendsStore } from '../store/useFriendsStore';
 import { usePopupStore } from '../store/usePopupStore';
 import { useSessionStore } from '../store/useSessionStore';
+import { getCategory } from '../store/useCatalogStore';
 import { useSpaceInviteStore } from '../store/useSpaceInviteStore';
 import { useUserStore } from '../store/useUserStore';
 import { colors, fonts, gradients, radii } from '../theme';
@@ -54,8 +54,6 @@ export function SpacesScreen() {
   const refreshFriends = useFriendsStore((state) => state.refresh);
   const openCreateModal = useCreateSessionModalStore((state) => state.open);
   const invites = useSpaceInviteStore((state) => state.invites);
-  const invitesLoaded = useSpaceInviteStore((state) => state.hasLoaded);
-  const refreshInvites = useSpaceInviteStore((state) => state.refresh);
   const acceptInvite = useSpaceInviteStore((state) => state.acceptInvite);
   const declineInvite = useSpaceInviteStore((state) => state.declineInvite);
   const announcedInviteIds = useSpaceInviteStore((state) => state.announcedIds);
@@ -66,14 +64,16 @@ export function SpacesScreen() {
   const [quote] = useState(pickRandomSpaceQuote);
 
   useEffect(() => {
-    if (sessions.length === 0) refreshSessions();
+    if (sessions.length === 0) void refreshSessions().catch(() => undefined);
   }, [sessions.length, refreshSessions]);
   useEffect(() => {
-    if (!friendsLoaded) refreshFriends();
+    if (!friendsLoaded) void refreshFriends().catch(() => undefined);
   }, [friendsLoaded, refreshFriends]);
+  // The feed is live (socket `space:changed`), but a tab visit is a cheap,
+  // natural moment to resync anything missed while backgrounded.
   useEffect(() => {
-    if (!invitesLoaded) refreshInvites();
-  }, [invitesLoaded, refreshInvites]);
+    if (isFocused) void refreshSessions().catch(() => undefined);
+  }, [isFocused, refreshSessions]);
 
   const friendIds = useMemo(
     () =>
@@ -119,7 +119,7 @@ export function SpacesScreen() {
     (s) => s.isPublic && !isFriendSpace(s, friendIds) && s.hostId !== user?._id
   );
 
-  const categoryForId = (categoryId: string) => mockSessionCategories.find((c) => c._id === categoryId);
+  const categoryForId = (categoryId: string) => getCategory(categoryId);
   const inviterFirstName = (fromUserId: string) =>
     getFriendProfile(fromUserId)?.displayName.split(' ')[0] ?? 'A friend';
 
@@ -130,25 +130,25 @@ export function SpacesScreen() {
   const columns = width >= 1024 ? 3 : width >= 600 ? 2 : 1;
   const cardWidth = columns === 1 ? containerWidth : (containerWidth - GRID_GAP * (columns - 1)) / columns;
 
+  const showError = (message: string) => {
+    const { showPopup, hidePopup } = usePopupStore.getState();
+    showPopup({ title: 'Couldn’t do that', message, actions: [{ label: 'OK', onPress: hidePopup }] });
+  };
+
   const startOwnScheduledSpace = (sessionId: string) => {
-    if (!user) return;
-    startScheduledSpace(sessionId, {
-      userId: user._id,
-      joinedAt: new Date().toISOString(),
-      leftAt: null,
-      completed: false,
-      targetHit: false,
-      displayName: user.displayName,
-      avatarInitial: user.displayName[0],
-    });
-    navigation.navigate('SessionRoom', { sessionId });
+    startScheduledSpace(sessionId)
+      .then(() => navigation.navigate('SessionRoom', { sessionId }))
+      .catch((err: Error) => showError(err.message));
   };
 
   const joinAndOpen = (sessionId: string) => {
-    joinSession(sessionId);
     const invite = pendingInviteBySpace.get(sessionId);
-    if (invite) acceptInvite(invite._id);
-    navigation.navigate('SessionRoom', { sessionId });
+    joinSession(sessionId)
+      .then(() => {
+        if (invite) acceptInvite(invite._id);
+        navigation.navigate('SessionRoom', { sessionId });
+      })
+      .catch((err: Error) => showError(err.message));
   };
 
   // "Kabir invited you" — greets each live invite once, the first time the
@@ -247,7 +247,7 @@ export function SpacesScreen() {
                         currentUserId={user?._id}
                         onJoin={() => joinAndOpen(session._id)}
                         invitedByName={invite ? inviterFirstName(invite.fromUserId) : undefined}
-                        onDismissInvite={invite ? () => declineInvite(invite._id) : undefined}
+                        onDismissInvite={invite ? () => void declineInvite(invite._id).catch(() => undefined) : undefined}
                       />
                     </View>
                   );
@@ -292,7 +292,7 @@ export function SpacesScreen() {
                       onToggleJoin={() => {
                         const alreadyJoined = Boolean(user && isUserInSession(session, user._id));
                         if (alreadyJoined) {
-                          leaveSession(session._id);
+                          leaveSession(session._id).catch((err: Error) => showError(err.message));
                         } else {
                           joinAndOpen(session._id);
                         }

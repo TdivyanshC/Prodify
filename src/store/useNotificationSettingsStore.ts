@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { getNotificationSettings, updateNotificationSettings } from '../services/userService';
 import type { NotificationCategory } from '../types/social';
 
 export interface QuietHours {
@@ -14,22 +15,36 @@ interface NotificationSettingsState {
   // Over the cap, notifications still land in the inbox — they just stop
   // interrupting.
   dailyToastCap: number;
+  load: () => Promise<void>;
   toggleCategory: (category: NotificationCategory) => void;
   setQuietHours: (patch: Partial<QuietHours>) => void;
   setDailyToastCap: (cap: number) => void;
 }
 
-// Notification preferences — the Phase 1 "Notifications settings" screen
-// from claude.md §2. Phase 2 persists these on the user doc; Phase 4's
-// delivery job reads the same values before sending a push.
-export const useNotificationSettingsStore = create<NotificationSettingsState>((set) => ({
+// Notification preferences, stored on the user (users.notificationPrefs) —
+// the server's delivery pipeline reads them for every notification, so the
+// in-app toast and Phase 4 push follow the same rules.
+export const useNotificationSettingsStore = create<NotificationSettingsState>((set, get) => ({
   categories: { spaces: true, friends: true, progress: true, nudges: true },
   quietHours: { enabled: true, startHour: 22, endHour: 8 },
   dailyToastCap: 6,
-  toggleCategory: (category) =>
-    set((state) => ({ categories: { ...state.categories, [category]: !state.categories[category] } })),
-  setQuietHours: (patch) => set((state) => ({ quietHours: { ...state.quietHours, ...patch } })),
-  setDailyToastCap: (cap) => set({ dailyToastCap: cap }),
+  load: async () => {
+    const s = await getNotificationSettings();
+    set({ categories: s.categories, quietHours: s.quietHours, dailyToastCap: s.dailyToastCap });
+  },
+  toggleCategory: (category) => {
+    const next = !get().categories[category];
+    set((state) => ({ categories: { ...state.categories, [category]: next } }));
+    void updateNotificationSettings({ categories: { [category]: next } }).catch(() => get().load());
+  },
+  setQuietHours: (patch) => {
+    set((state) => ({ quietHours: { ...state.quietHours, ...patch } }));
+    void updateNotificationSettings({ quietHours: patch }).catch(() => get().load());
+  },
+  setDailyToastCap: (cap) => {
+    set({ dailyToastCap: cap });
+    void updateNotificationSettings({ dailyToastCap: cap }).catch(() => get().load());
+  },
 }));
 
 export function isWithinQuietHours(quietHours: QuietHours, date: Date = new Date()): boolean {

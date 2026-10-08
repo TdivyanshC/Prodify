@@ -11,14 +11,13 @@ import { SparkPeek } from '../components/Mascot/SparkPeek';
 import { ScreenBackground } from '../components/ScreenBackground/ScreenBackground';
 import { CreatorQuote } from '../components/Sessions/CreatorQuote';
 import { SessionCard } from '../components/Sessions/SessionCard';
-import { mockHomeStats } from '../mocks/homeStats.mock';
-import { mockSessionCategories } from '../mocks/sessionCategories.mock';
 import type { RootStackParamList } from '../navigation/routes';
 import { useCreateSessionModalStore } from '../store/useCreateSessionModalStore';
 import { useFriendsStore } from '../store/useFriendsStore';
 import { useNotificationStore } from '../store/useNotificationStore';
 import { usePopupStore } from '../store/usePopupStore';
 import { useSessionStore } from '../store/useSessionStore';
+import { getCategory } from '../store/useCatalogStore';
 import { useSparkOverlayStore, type SparkEventKey } from '../store/useSparkOverlayStore';
 import { useUserStore } from '../store/useUserStore';
 import { pickRandomLottie } from '../utils/lottiePool';
@@ -40,6 +39,8 @@ export function HomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const user = useUserStore((state) => state.user);
   const refreshUser = useUserStore((state) => state.refresh);
+  const summary = useUserStore((state) => state.summary);
+  const sessionsCompletedTotal = summary?.sessionsCompletedTotal ?? user?.counters?.sessionsCompleted ?? 0;
   const sessions = useSessionStore((state) => state.sessions);
   const refreshSessions = useSessionStore((state) => state.refresh);
   const joinSession = useSessionStore((state) => state.joinSession);
@@ -63,13 +64,13 @@ export function HomeScreen() {
   );
 
   useEffect(() => {
-    if (!user) refreshUser();
+    if (!user) void refreshUser().catch(() => undefined);
   }, [user, refreshUser]);
   useEffect(() => {
-    if (sessions.length === 0) refreshSessions();
+    if (sessions.length === 0) void refreshSessions().catch(() => undefined);
   }, [sessions.length, refreshSessions]);
   useEffect(() => {
-    if (!friendsLoaded) refreshFriends();
+    if (!friendsLoaded) void refreshFriends().catch(() => undefined);
   }, [friendsLoaded, refreshFriends]);
 
   const focusingFriends = useMemo(() => {
@@ -98,7 +99,7 @@ export function HomeScreen() {
     let vars: Record<string, string | number> = {};
     if (streak > 0 && streak % 7 === 0) eventKey = 'streak_milestone';
     else if (daysSinceActive >= 2) eventKey = 'inactivity';
-    else if (mockHomeStats.sessionsCompletedTotal === 0) eventKey = 'first_visit';
+    else if (sessionsCompletedTotal === 0) eventKey = 'first_visit';
     else if (focusingFriends.length > 0) {
       eventKey = 'friends_live';
       vars = {
@@ -118,7 +119,7 @@ export function HomeScreen() {
   const handlePeekPress = () => {
     // Personality tier (§9): Spark gets more familiar as sessionsCompleted
     // grows — first_visit -> returning -> regular.
-    const sessionsCompleted = mockHomeStats.sessionsCompletedTotal;
+    const sessionsCompleted = sessionsCompletedTotal;
     const tier: SparkEventKey =
       sessionsCompleted === 0 ? 'first_visit' : sessionsCompleted < 6 ? 'returning' : 'regular';
     showSpark(tier);
@@ -129,14 +130,20 @@ export function HomeScreen() {
   const activeSessions = sessions.filter(
     (s) => s.status === 'active' && (s.isBotSeeded || s.hostId === user?._id)
   );
-  const categoryForId = (categoryId: string) => mockSessionCategories.find((c) => c._id === categoryId);
+  const categoryForId = (categoryId: string) => getCategory(categoryId);
 
   // Every Start Session tap shows the popup with a fresh quote — never
   // the same canned line twice in a row (pickRandomSessionQuote) — and
   // only navigates into the room once the user acknowledges it.
   const handleStartSession = (session: (typeof activeSessions)[number]) => {
     if (!(user && isUserInSession(session, user._id))) {
-      joinSession(session._id);
+      joinSession(session._id).catch((err: Error) =>
+        usePopupStore.getState().showPopup({
+          title: 'Couldn’t join',
+          message: err.message,
+          actions: [{ label: 'OK', onPress: () => usePopupStore.getState().hidePopup() }],
+        })
+      );
     }
     usePopupStore.getState().showPopup({
       title: 'Session started!',
@@ -169,9 +176,9 @@ export function HomeScreen() {
 
           {user ? (
             <StreakSpotlight
-              productiveMinutesToday={mockHomeStats.productiveMinutesToday}
-              dailyTargetMinutes={mockHomeStats.dailyTargetMinutes}
-              xpToday={mockHomeStats.xpToday}
+              productiveMinutesToday={summary?.todayMinutes ?? 0}
+              dailyTargetMinutes={summary?.dailyTargetMin ?? user.dailyTargetMin ?? 30}
+              xpToday={summary?.xpToday ?? 0}
               currentStreak={user.streak.current}
             />
           ) : null}

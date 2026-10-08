@@ -1,31 +1,14 @@
 import { create } from 'zustand';
-import { mockTogetherStreaks } from '../mocks/togetherStreaks.mock';
 import type { TogetherStreak } from '../types/social';
-import { advanceTogetherStreak, getLiveTogetherStreak } from '../utils/togetherStreak';
-
-export interface TogetherStreakChange {
-  userId: string;
-  before: number;
-  after: number;
-}
 
 interface TogetherStreakStoreState {
+  // Keyed by friend userId. Advanced only by the server's session-close
+  // transaction (same space, ≥10 min overlap, day credited — backend doc §7.4).
   streaks: Record<string, TogetherStreak>;
-  // Called when the user finishes a streak-eligible session in a space
-  // with these friends present. Returns what changed for Post-Session.
-  recordTogether: (friendIds: string[]) => TogetherStreakChange[];
+  merge: (streaks: Record<string, TogetherStreak>) => void;
 }
 
-export const useTogetherStreakStore = create<TogetherStreakStoreState>((set, get) => ({
-  streaks: mockTogetherStreaks,
-  recordTogether: (friendIds) => {
-    const streaks = { ...get().streaks };
-    const changes = friendIds.map((userId) => {
-      const before = getLiveTogetherStreak(streaks[userId]);
-      streaks[userId] = advanceTogetherStreak(streaks[userId]);
-      return { userId, before, after: getLiveTogetherStreak(streaks[userId]) };
-    });
-    set({ streaks });
-    return changes;
-  },
+export const useTogetherStreakStore = create<TogetherStreakStoreState>((set) => ({
+  streaks: {},
+  merge: (streaks) => set((state) => ({ streaks: { ...state.streaks, ...streaks } })),
 }));

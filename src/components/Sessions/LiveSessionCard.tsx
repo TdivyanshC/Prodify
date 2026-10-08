@@ -6,7 +6,7 @@ import type { Session, SessionCategory } from '../../types/models';
 import { colors, fonts, gradients, radii } from '../../theme';
 import { getCategoryColor } from '../../theme/categoryColors';
 import { getRemainingMinutes, isUserInSession } from '../../utils/sessionHelpers';
-import { mockUser } from '../../mocks/user.mock';
+import { useUserStore } from '../../store/useUserStore';
 
 interface LiveSessionCardProps {
   session: Session;
@@ -21,7 +21,8 @@ interface LiveSessionCardProps {
 }
 
 export function LiveSessionCard({ session, category, onToggleJoin, onPress, featured }: LiveSessionCardProps) {
-  const joined = isUserInSession(session, mockUser._id);
+  const userId = useUserStore((state) => state.user?._id ?? '');
+  const joined = isUserInSession(session, userId);
   const remainingMin = getRemainingMinutes(session);
   const scale = useRef(new Animated.Value(1)).current;
   const accentColor = getCategoryColor(category?._id, colors.primary);

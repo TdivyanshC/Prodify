@@ -1,6 +1,6 @@
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Header } from '../components/AppShell/Header';
@@ -10,10 +10,12 @@ import { FriendCard } from '../components/Friends/FriendCard';
 import { FriendRequestRow } from '../components/Friends/FriendRequestRow';
 import { SuggestedFriendCard } from '../components/Friends/SuggestedFriendCard';
 import { ScreenBackground } from '../components/ScreenBackground/ScreenBackground';
-import { mockFriendProfiles } from '../mocks/friends.mock';
 import { DESKTOP_BREAKPOINT, type RootStackParamList } from '../navigation/routes';
 import { useFriendsStore } from '../store/useFriendsStore';
 import { usePopupStore } from '../store/usePopupStore';
+import { usePeopleStore } from '../store/usePeopleStore';
+import { getSuggestions } from '../services/friendService';
+import type { FriendProfile } from '../types/social';
 import { useUserStore } from '../store/useUserStore';
 import { colors, fonts } from '../theme';
 import { getFriendProfile, getOtherUserId } from '../utils/friendHelpers';
@@ -37,9 +39,21 @@ export function FriendsScreen() {
   const showPopup = usePopupStore((state) => state.showPopup);
   const hidePopup = usePopupStore((state) => state.hidePopup);
 
+  const [suggestions, setSuggestions] = useState<FriendProfile[]>([]);
+  const profiles = usePeopleStore((state) => state.profiles);
+
   useEffect(() => {
-    if (friendships.length === 0) refresh();
+    if (friendships.length === 0) void refresh().catch(() => undefined);
   }, [friendships.length, refresh]);
+  // Friends-of-friends, ranked by mutual friends (GET /friends/suggestions).
+  useEffect(() => {
+    getSuggestions()
+      .then(({ items }) => {
+        usePeopleStore.getState().upsert(items);
+        setSuggestions(items);
+      })
+      .catch(() => undefined);
+  }, [friendships.length]);
 
   const incomingRequests = useMemo(
     () => friendships.filter((f) => f.status === 'pending' && f.requestedBy !== user?._id),
@@ -58,16 +72,17 @@ export function FriendsScreen() {
       ),
     [friendships, user?._id]
   );
+  // Server suggestions, plus people the user already asked (shown as
+  // "Requested" rather than a separate section).
   const suggested = useMemo(() => {
-    const excluded = new Set([
-      ...acceptedFriendships.map((f) => getOtherUserId(f, user?._id)),
-      ...incomingRequests.map((f) => getOtherUserId(f, user?._id)),
-    ]);
-    return mockFriendProfiles.filter((p) => !excluded.has(p._id));
-  }, [acceptedFriendships, incomingRequests, user?._id]);
+    const outgoing = [...outgoingRequestedIds].map((id) => profiles[id]).filter((p): p is FriendProfile => Boolean(p));
+    return [...outgoing, ...suggestions.filter((p) => !outgoingRequestedIds.has(p._id))];
+  }, [suggestions, outgoingRequestedIds, profiles]);
+
+  const showError = (err: Error) => showPopup({ title: 'Couldn’t do that', message: err.message, actions: [{ label: 'OK', onPress: hidePopup }] });
 
   const handleAccept = (friendshipId: string, name: string) => {
-    acceptRequest(friendshipId);
+    acceptRequest(friendshipId).catch(showError);
     showPopup({
       title: 'New friend! 🎉',
       message: `You and ${name} are now accountability buddies.`,
@@ -76,7 +91,7 @@ export function FriendsScreen() {
   };
 
   const handleAdd = (userId: string, name: string) => {
-    sendRequest(userId);
+    sendRequest(userId).catch(showError);
     showPopup({ message: `Friend request sent to ${name} 🤝`, actions: [{ label: 'OK', onPress: hidePopup }] });
   };
 
@@ -98,7 +113,7 @@ export function FriendsScreen() {
                       key={f._id}
                       profile={profile}
                       onAccept={() => handleAccept(f._id, profile.displayName)}
-                      onDecline={() => declineRequest(f._id)}
+                      onDecline={() => void declineRequest(f._id).catch(showError)}
                     />
                   );
                 })}

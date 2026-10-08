@@ -1,7 +1,8 @@
 import Feather from '@expo/vector-icons/Feather';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Card } from '../components/Card/Card';
 import { StatTile } from '../components/Profile/StatTile';
@@ -12,7 +13,9 @@ import { useCreateSessionModalStore } from '../store/useCreateSessionModalStore'
 import { colors, fonts, gradients, radii } from '../theme';
 import type { FriendProfile } from '../types/social';
 import { getFriendProfile } from '../utils/friendHelpers';
-import { getWeeklyRecap } from '../utils/progressStats';
+import type { WeeklyRecapResponse } from '../api/types';
+import { getLatestRecap } from '../services/userService';
+import { getCategory } from '../store/useCatalogStore';
 import { formatMinutes } from '../utils/sessionHelpers';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'WeeklyRecap'>;
@@ -21,7 +24,23 @@ type Props = NativeStackScreenProps<RootStackParamList, 'WeeklyRecap'>;
 // Wrapped-style recap the append-only points ledger is kept for
 // (claude.md §4). Opened from the weekly_recap notification.
 export function WeeklyRecapScreen({ navigation }: Props) {
-  const recap = getWeeklyRecap();
+  const [data, setData] = useState<WeeklyRecapResponse | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    getLatestRecap().then(setData).catch(() => setFailed(true));
+  }, []);
+
+  if (!data) {
+    return (
+      <SafeAreaView style={[styles.safeArea, { alignItems: 'center', justifyContent: 'center' }]}>
+        <ScreenBackground />
+        {failed ? <Text style={styles.heroSub}>Couldn’t load your week. Try again in a bit.</Text> : <ActivityIndicator color={colors.primary} />}
+      </SafeAreaView>
+    );
+  }
+
+  // Last complete Mon–Sun week, from the weeklyRecaps rollup.
+  const recap = { ...data, totalLabel: formatMinutes(data.totalMinutes), topCategory: getCategory(data.topCategoryId ?? undefined) };
   const friends = recap.focusedWithFriendIds
     .map((id) => getFriendProfile(id))
     .filter((p): p is FriendProfile => Boolean(p));

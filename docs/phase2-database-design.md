@@ -7,6 +7,19 @@ condensed pointer here — this file is the authoritative detail. Locked
 decisions from the design conversation are folded in directly (no "TBD"s left
 where a call was actually made).*
 
+*Revision 2026-10-05 (with `docs/phase2-backend-architecture.md` v2): the
+schema now covers what the built Phase 1 client consumes:
+
+- spaces are time-boxed occurrences (scheduled → active →
+  completed/cancelled), not persistent rooms (backend doc §3 C3, **pending
+  confirmation as D1**)
+- reactions have a polymorphic context
+- the notification document has its full shape
+- users have counters and notification prefs
+- three new collections: `togetherStreaks`, `spaceReminders`, `weeklyRecaps`
+
+Superseded text is replaced in place, not kept alongside.*
+
 ---
 
 ## 1. Core conceptual model: Session vs Space
@@ -21,10 +34,12 @@ follow-up).
   streaks, XP, and analytics are computed from. A user never sees "Sessions"
   as a social/discovery surface; it's the ledger under the hood (still
   surfaced to them as their personal history/stats).
-- **Space** = a persistent, shared room scoped to one niche/category, created
+- **Space** = a shared, time-boxed room scoped to one niche/category, created
   by a user (usually to do something with friends), that others join in real
-  time. A Space is a **social container, not a stopwatch** — it doesn't hold
-  time itself. When a user is present and clocking time in a Space, that
+  time. It can be scheduled ahead, goes live, and ends once it's empty.
+  "Start one like this" re-creates it. (Revised 2026-10-05 from
+  "persistent room"; see the revision note above.) A Space is a **social
+  container, not a stopwatch**: it doesn't hold time itself. When a user is present and clocking time in a Space, that
   presence *is* a Session for them (`sessions.spaceId` set, `categoryId` =
   the Space's niche). This is what makes "joining a Coding space" and
   "starting a Coding session" the same underlying event, per your
@@ -45,7 +60,10 @@ there's no separate counting logic to keep in sync.
 {
   _id,
   googleId: null,             // populated Phase 2
+  firebaseUid,                 // auth lookup key (Firebase Auth, backend doc §5.2)
   handle: null,                // unique, lowercase, indexed — search/discovery
+  tagline: "",                 // ≤80 chars, shown on friend cards/profile
+  favoriteCategoryId: null,    // nightly job: top niche by last-30-day dailyStats
   email,
   authProvider: "google",
   status: "active" | "suspended" | "banned" | "deleted",
@@ -67,12 +85,29 @@ there's no separate counting logic to keep in sync.
     freezesUsed: 0,
   },
   points: 0,                   // denormalized running XP total — source of truth is pointsLedger
+  level: 1,                    // levelFor(points), packages/shared/rules/levels.ts (curve = open decision D3)
   badgeIds: [ObjectId],
+  counters: {                  // threshold-cross inputs for non-XP badges (backend doc §7.5)
+    sessionsCompleted: 0, earlySessions: 0, lateSessions: 0, friends: 0,
+  },
+  notificationPrefs: {         // backend doc §8.5
+    categories: { spaces: true, friends: true, progress: true, nudges: true },
+    quietHours: { enabled: true, startHour: 22, endHour: 8 },
+    dailyToastCap: 6,
+    friendAlertIds: [userId],  // "tell me when they start a space" — accepted friends only
+  },
   createdAt,
   lastActiveAt,
 }
 ```
-Indexes: unique `googleId` (sparse), unique `handle` (sparse until populated).
+Indexes:
+
+- unique `googleId` (sparse)
+- unique `firebaseUid`
+- unique `handle` (sparse until populated)
+- `{timezone}`, for dayRollover/weeklyRecap bucketing
+- `{'notificationPrefs.friendAlertIds'}` (multikey), for the
+  `friend_started_space` fan-out
 
 ### `sessionCategories` (unchanged — the niche catalog: Study, Gym, Coding, Walk, …)
 
@@ -80,27 +115,39 @@ Indexes: unique `googleId` (sparse), unique `handle` (sparse until populated).
 { _id, name, icon, isCustom: false, createdBy: null }
 ```
 
-### `spaces` (NEW)
+### `spaces` (NEW — revised 2026-10-05: occurrence, not persistent room)
 
 ```js
 {
   _id,
   categoryId,                  // the niche — locks what "hours in this space" counts as
-  name,
-  description,
-  createdBy,                   // host/admin of the space
-  isPublic: true,
+  name,                        // ≤40 chars
+  description,                 // ≤140 chars, nullable
+  hostId,                      // creator; null only for bot-seeded rooms
+  isPublic: true,              // false = friends-only 🔒 (never in "open to everyone")
   maxParticipants: null,
-  status: "active" | "archived",
-  memberIds: [userId],         // the persistent roster (small, bounded — friends who belong here)
+  durationTargetMin,           // shared goal; each member's session copies it as targetDurationMin
+  status: "scheduled" | "active" | "completed" | "cancelled",
+  startTime,                   // scheduled start, or actual go-live time once active
+  endedAt: null,
+  invitedUserIds: [userId],    // capped at 50 — "who was asked", not who came
+  declinedUserIds: [userId],
+  liveCount: 0,                // open sessions right now — atomic capacity guard (backend doc §6.2)
+  isBotSeeded: false,
+  syntheticCount: 0,           // bot-seeded only (Phase 4) — never backed by sessions
   createdAt,
 }
 ```
-`memberIds` is bounded (friend-group sized) so embedding is fine — this is
-"who belongs to this space," not "who's online right now." Live presence is
-explicitly **not** stored here (see §7).
+Live presence is explicitly **not** stored here (see §7). `liveCount` is
+only the capacity counter. The old `memberIds` roster is dropped: "who was
+in this space" is answered by `sessions{spaceId}`.
 
-Indexes: `{categoryId, status}` (browse/discover query), `{memberIds}` (multikey — "spaces I'm in").
+Indexes:
+
+- `{status, isPublic, categoryId, startTime}`, for public browse
+- `{hostId, status, startTime}`, for friends' live/scheduled/recently-ended
+  spaces (queried with `hostId: {$in: friendIds}`)
+- `{invitedUserIds, status}` (multikey), for "invited to"
 
 ### `sessions` (redefined — the personal time ledger)
 
@@ -115,13 +162,16 @@ Indexes: `{categoryId, status}` (browse/discover query), `{memberIds}` (multikey
   endTime: null,                 // null while active
   durationMin: 0,                // computed on close
   targetDurationMin,
-  status: "active" | "completed" | "abandoned",
+  status: "active" | "closing" | "completed",
+  closedReason: null,            // "left" | "completed" | "timeout" | "space_ended"
   completed: false,
-  targetHit: false,
+  targetHit: false,              // server-derived: durationMin >= targetDurationMin (never client-sent)
   xpEarned: 0,
   createdAt,
 }
 ```
+Partial unique index `{userId}` where `status: "active"` allows at most one
+open session per user (backend doc §7.1).
 One document per continuous clock-in — not per room, not per user-lifetime.
 A user joining a Space for three separate stretches in an evening produces
 three `sessions` docs. This replaces the old embedded `participants[]`
@@ -184,14 +234,24 @@ Blocking hard-deletes any existing friendship/pending request between the
 two users and prevents new ones either direction; also filters the blocked
 user out of Space discovery and member lists. Unique index `{blockerId, blockedId}`.
 
-### `reactions`
+### `reactions` (revised 2026-10-05: polymorphic context)
 
 ```js
-{ _id, sessionId, fromUserId, toUserId, type: "clap" | "fire" | "fist_bump", createdAt }
+{
+  _id,
+  contextType: "space" | "milestone",
+  contextId,                    // spaceId, or "milestone_<userId>_<n>" for a friend's streak milestone
+  fromUserId, toUserId,
+  type: "clap" | "fire" | "fist_bump",
+  createdAt,
+}
 ```
-Unique index `{sessionId, fromUserId, toUserId, type}` — upsert-on-send
-(toggle, like Instagram's like button), not append-only inserts, so one user
-can't spam-react 50 times in one session.
+The client reacts to friends *in a space* (cards and the room) and to a
+friend's *streak milestone* (Send 🔥). Neither of those is a ledger
+`sessions` doc, so the old `sessionId` key didn't fit. Unique index
+`{contextType, contextId, fromUserId, toUserId, type}` gives toggle
+semantics (Instagram-like), not append-only, so one user can't spam-react
+50 times.
 
 ### `badges` — extend catalog with the XP tiers
 
@@ -209,11 +269,80 @@ can't spam-react 50 times in one session.
 ```
 Indexes: `{userId, timestamp}`.
 
-### `mascotEvents`, `notifications`, `reports` — unchanged shape, extended `type` enums
+### `notifications` (revised 2026-10-05: full in-app shape)
 
-- `notifications.type` gains: `friend_request`, `friend_accepted`, `space_invite`,
-  `friend_joined_space`, `badge_earned`, `streak_at_risk`, `level_up`.
+Mirrors the Phase 1 `AppNotification` type (`src/types/social.ts`), so the
+inbox swap is drop-in. Pipeline semantics are in backend doc §8.
+
+```js
+{
+  _id, userId,
+  eventId,                       // deterministic source-event id — dedupe key
+  absorbedEventIds: [],          // events merged into this one via groupKey
+  type,                          // 19 types — see AppNotificationType
+  category: "spaces" | "friends" | "progress" | "nudges",
+  title, body,                   // rendered at write time from shared copy
+  copyVariantId, copyVars: {},
+  sender: { kind: "spark" } | { kind: "friend", userId } | { kind: "system", emoji },
+  tone: "default" | "reward" | "nudge",
+  priority: "normal" | "high",
+  actions: [{ kind, label }],
+  payload: {},                   // spaceId, spaceName, fromUserId(s), friendshipId, badgeId, level, …
+  groupKey: null,
+  delivery: "toast" | "inbox" | "held",
+  heldForSessionId: null,
+  actionTaken: null,             // e.g. "accepted", "reminder_set" — rewritten row state
+  scheduledAt, sentAt, openedAt: null,
+  createdAt,
+}
+```
+Indexes:
+
+- unique `{userId, eventId}`, for dedupe
+- `{userId, createdAt}`, for inbox paging
+- `{userId, category, createdAt}`, for the filter tabs
+- `{userId, groupKey, openedAt}`, for group merge
+- `{userId, heldForSessionId}`, for "While you focused"
+- TTL 90 days on `createdAt`
+
+### `mascotEvents`, `reports` — unchanged shape
+
 - `mascotEvents` priority order is unchanged from §4.
+
+### `togetherStreaks` (NEW)
+
+```js
+{ _id, pairKey /* "<smallerId>_<largerId>" */, userIds: [a, b], current, longest, lastTogetherDay /* "YYYY-MM-DD" */ }
+```
+One doc per friend pair, advanced in the session-close transaction
+(backend doc §7.4). A day counts when the two overlapped ≥10 min in the
+same space and the closer's day was credited. The "live" value is `current`
+only if `lastTogetherDay` is today or yesterday (the same rule as
+`getLiveTogetherStreak`). Indexes: unique `{pairKey}`, `{userIds}`
+(multikey).
+
+### `spaceReminders` (NEW)
+
+```js
+{ _id, userId, spaceId, remindAt, createdAt }
+```
+"Remind me" on a scheduled space. Indexes: unique `{userId, spaceId}`,
+`{spaceId}` (job fan-out), TTL on `remindAt` + 1 day.
+
+### `weeklyRecaps` (NEW)
+
+```js
+{
+  _id, userId, weekStart /* Monday "YYYY-MM-DD" */,
+  totalMinutes, days: [{ date, minutes }], bestDay: { date, minutes },
+  topCategoryId, sessionsCompleted, spacesJoined,
+  focusedWithFriendIds: [userId], cheersReceived, xpEarned, createdAt,
+}
+```
+Materialized by the Sunday `weeklyRecap` job from `userDailyTotal`,
+`dailyStats`, `sessions` (co-present friends via a shared `spaceId`) and
+`reactions` (`toUserId`). Unique `{userId, weekStart}`. It also serves as
+the input for a future "Wrapped" recap.
 
 ### `authSessions` (NEW — was missing; needed for real Google OAuth)
 
@@ -255,11 +384,15 @@ no doc ──send──▶ pending ──accept──▶ accepted ──unfriend
 
 ## 4. Space lifecycle
 
+> **Superseded 2026-10-05** by backend doc §6, which covers the state
+> machine (`scheduled → active → completed | cancelled`), the
+> visibility/access table, invites, and capacity. The steps below are kept
+> only where still accurate. `memberIds` references no longer apply.
+
 1. **Create:** `POST /spaces` — user picks a `categoryId`, name, visibility,
    optional friend invitees. Creator is auto-added to `memberIds`.
 2. **Join:** `POST /spaces/:id/join` —
    - Validate: not blocked by any current member/host, space not full/archived.
-   - Add to `memberIds` if not already present (idempotent).
    - **Open a `sessions` doc**: `{userId, categoryId: space.categoryId, spaceId: space._id, type: "space", startTime: now, status: "active"}`.
    - Register presence in Redis (§7).
 3. **Leave / disconnect:** close the open `sessions` doc (`endTime`,
@@ -268,8 +401,7 @@ no doc ──send──▶ pending ──accept──▶ accepted ──unfriend
    leave should close the session too, after a short grace period (handles
    dropped connections without losing the clocked time).
 4. Re-joining later (same day or another day) opens a new `sessions` doc —
-   same as re-starting a solo session. The member stays in `memberIds`
-   between visits; that list is the roster, not the live attendance.
+   same as re-starting a solo session.
 
 ---
 
@@ -300,6 +432,16 @@ On every session close (`sessions.status → "completed"`):
    of the 1,000 / 5,000 / 10,000 XP badges not already in `badgeIds`, push
    the badge and fire a `mascotEvent` (`badge_earned`, high priority per the
    existing order).
+
+Backend doc §7.3 (v2) adds four steps to this flow:
+
+- counters (`sessionsCompleted`, `earlySessions`, `lateSessions`)
+- together streaks (§2 `togetherStreaks`)
+- level and `mascotStage`
+- generalized badge evaluators
+
+It also adds a "credit the day at most once" guard on step 6
+(`lastActiveDate === today` → no-op).
 
 All of steps 2–7 should run inside a single Mongo transaction (multi-document
 ACID transactions are fine at this write volume) so a crash mid-flow can't
@@ -335,7 +477,7 @@ Two different data needs, two different stores — don't conflate them:
   not survive real concurrency).
 - **"How much has my friend contributed" (daily/weekly), shown inside the
   space:** locked decision — **niche-wide**, not scoped to this one space.
-  Query `dailyStats` for `{userId: IN space.memberIds, categoryId: space.categoryId}`
+  Query `dailyStats` for `{userId: IN <present members>, categoryId: space.categoryId}`
   over the relevant date range. This deliberately shows a member's total
   Coding time everywhere (this space, other spaces, solo sessions), not just
   time spent in this particular room — matches "so users know how much time
@@ -396,8 +538,13 @@ type nominally supports `type: "solo"`.
 |---|---|---|
 | `users` | unique `googleId` (sparse) | auth lookup |
 | `users` | unique `handle` (sparse) | search/discovery |
-| `spaces` | `{categoryId, status}` | browse/discover |
-| `spaces` | `{memberIds}` | "spaces I'm in" |
+| `users` | unique `firebaseUid` | auth lookup |
+| `users` | `{timezone}` | per-timezone jobs |
+| `users` | `{notificationPrefs.friendAlertIds}` | alert fan-out |
+| `spaces` | `{status, isPublic, categoryId, startTime}` | public browse |
+| `spaces` | `{hostId, status, startTime}` | friends' live/scheduled/ended |
+| `spaces` | `{invitedUserIds, status}` | "invited to" |
+| `sessions` | partial unique `{userId}` where `status:"active"` | one open session per user |
 | `sessions` | `{userId, startTime}` | personal history |
 | `sessions` | `{spaceId, startTime}` | space attendance history |
 | `sessions` | `{categoryId, status}` | live/active browse |
@@ -405,10 +552,19 @@ type nominally supports `type: "solo"`.
 | `userDailyTotal` | unique `{userId, date}` | rollup upsert + combined report |
 | `friendships` | unique `{userIdA, userIdB}` | canonical pair, race-safe |
 | `blocks` | unique `{blockerId, blockedId}` | dedup |
-| `reactions` | unique `{sessionId, fromUserId, toUserId, type}` | dedup/toggle |
+| `reactions` | unique `{contextType, contextId, fromUserId, toUserId, type}` | dedup/toggle |
 | `pointsLedger` | `{userId, timestamp}` | ledger reads |
 | `mascotEvents` | `{userId, deliveredAt}` | fetch-next-undelivered |
-| `notifications` | `{userId, sentAt}` + TTL | inbox + auto-expire |
+| `notifications` | unique `{userId, eventId}` | dedupe |
+| `notifications` | `{userId, createdAt}` | inbox paging |
+| `notifications` | `{userId, category, createdAt}` | filter tabs |
+| `notifications` | `{userId, groupKey, openedAt}` | group merge |
+| `notifications` | TTL 90 days on `createdAt` | auto-expire |
+| `togetherStreaks` | unique `{pairKey}` | pair lookup |
+| `togetherStreaks` | `{userIds}` | "my together streaks" |
+| `spaceReminders` | unique `{userId, spaceId}` | dedupe |
+| `spaceReminders` | `{spaceId}` + TTL | reminder job fan-out |
+| `weeklyRecaps` | unique `{userId, weekStart}` | recap reads |
 | `authSessions` | `{userId, revokedAt}` | device session management |
 
 ---

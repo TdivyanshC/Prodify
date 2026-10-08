@@ -1,5 +1,6 @@
-// Mirrors the MongoDB collection shapes in claude.md §5, so mock services can
-// return data that's a drop-in swap for real API responses in Phase 2.
+// Client-side shapes of the Phase 2 API's DTOs (server/src/modules/views.ts).
+// They kept the Phase 1 field names, so screens built against the mocks
+// read live data unchanged.
 
 export interface Streak {
   current: number;
@@ -20,6 +21,15 @@ export interface User {
   badgeIds: string[];
   createdAt: string;
   lastActiveAt: string;
+  // Phase 2 additions (server DTO).
+  handle?: string | null;
+  tagline?: string;
+  level?: number;
+  // XP bounds of the current level (server rules — curve is provisional, D3).
+  levelProgress?: { level: number; levelStartXp: number; nextLevelXp: number };
+  dailyTargetMin?: number;
+  timezone?: string;
+  counters?: { sessionsCompleted: number; earlySessions: number; lateSessions: number; friends: number };
 }
 
 export interface SessionCategory {
@@ -36,8 +46,7 @@ export interface SessionParticipant {
   leftAt: string | null;
   completed: boolean;
   targetHit: boolean;
-  // Denormalized display fields — a real API would resolve these via a
-  // join with `users`; stored directly here for the Phase 1 mock so
+  // Denormalized display fields — the API resolves them from `users` so
   // session cards don't need a separate participant-lookup service.
   displayName: string;
   avatarInitial: string;
@@ -54,9 +63,8 @@ export interface Session {
   description: string | null;
   isPublic: boolean;
   maxParticipants: number | null;
-  // Real headline count (e.g. "24 people") — `participants` below only
-  // holds a small preview for avatar rendering, so mocks don't need to
-  // hand-author dozens of fake participant records.
+  // Real headline count (live sessions + a seeded room's synthetic count) —
+  // `participants` below lists the people actually present.
   participantCount: number;
   type: 'solo' | 'multiplayer';
   hostId: string | null;
@@ -65,10 +73,19 @@ export interface Session {
   durationTargetMin: number;
   status: 'scheduled' | 'active' | 'completed' | 'cancelled';
   participants: SessionParticipant[];
-  // Friends the host invited at creation (`POST /spaces` invitees in
-  // Phase 2) — people asked, not people present; they only show up in
-  // `participants` once they actually join.
+  // Friends the host invited — people asked, not people present; they only
+  // show up in `participants` once they actually join. Only returned to the
+  // host and invitees.
   invitedUserIds?: string[];
+  endedAt?: string | null;
+  // Per-viewer flags computed by the server (access rules live there).
+  viewer?: {
+    isIn: boolean;
+    isHost: boolean;
+    canInvite: boolean;
+    reminderOn: boolean;
+    inviteId: string | null;
+  };
 }
 
 export interface Badge {
@@ -91,11 +108,16 @@ export interface Friendship {
   status: 'pending' | 'accepted' | 'declined';
   requestedBy: string;
   createdAt: string;
+  respondedAt?: string | null;
 }
 
+// contextType 'space' → contextId is a space id; 'milestone' → a friend's
+// streak-milestone id (backend doc §3 C4 — reactions aren't tied to ledger
+// sessions).
 export interface Reaction {
   _id: string;
-  sessionId: string;
+  contextType: 'space' | 'milestone';
+  contextId: string;
   fromUserId: string;
   toUserId: string;
   type: 'clap' | 'fire' | 'fist_bump';

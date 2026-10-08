@@ -1,6 +1,5 @@
 import { create } from 'zustand';
-import { mockUser } from '../mocks/user.mock';
-import { getSpaceInvites } from '../services/spaceService';
+import { declineSpaceInvite } from '../services/spaceService';
 import type { SpaceInvite } from '../types/social';
 
 interface SpaceInviteStoreState {
@@ -9,46 +8,27 @@ interface SpaceInviteStoreState {
   // Invites the "X invited you" popup has already been shown for, so it
   // greets each invite once instead of on every visit to the Spaces tab.
   announcedIds: string[];
-  refresh: () => Promise<void>;
-  sendInvites: (spaceId: string, toUserIds: string[]) => void;
+  setInvites: (invites: SpaceInvite[]) => void;
   acceptInvite: (inviteId: string) => void;
-  declineInvite: (inviteId: string) => void;
+  declineInvite: (inviteId: string) => Promise<void>;
   markAnnounced: (inviteId: string) => void;
 }
 
-// Space invites, both directions: ones friends sent the user (shown on the
-// Spaces tab) and ones the user sent when creating a space. Same
-// mutate-the-shared-store pattern as useFriendsStore.
-export const useSpaceInviteStore = create<SpaceInviteStoreState>((set) => ({
+// Space invites received — the client read model of the server's
+// `space_invite` notifications, delivered inside GET /spaces/feed.
+// Accepting = joining the space (the join marks it server-side).
+export const useSpaceInviteStore = create<SpaceInviteStoreState>((set, get) => ({
   invites: [],
   hasLoaded: false,
   announcedIds: [],
-  refresh: async () => {
-    const invites = await getSpaceInvites();
-    set({ invites, hasLoaded: true });
-  },
-  sendInvites: (spaceId, toUserIds) => {
-    const createdAt = new Date().toISOString();
-    const outgoing: SpaceInvite[] = toUserIds.map((toUserId) => ({
-      _id: `invite_${spaceId}_${toUserId}`,
-      spaceId,
-      fromUserId: mockUser._id,
-      toUserId,
-      status: 'pending',
-      createdAt,
-    }));
-    set((state) => ({ invites: [...state.invites, ...outgoing] }));
-  },
+  setInvites: (invites) => set({ invites, hasLoaded: true }),
   acceptInvite: (inviteId) =>
-    set((state) => ({
-      invites: state.invites.map((i) => (i._id === inviteId ? { ...i, status: 'accepted' } : i)),
-    })),
-  declineInvite: (inviteId) =>
-    set((state) => ({
-      invites: state.invites.map((i) => (i._id === inviteId ? { ...i, status: 'declined' } : i)),
-    })),
+    set((state) => ({ invites: state.invites.map((i) => (i._id === inviteId ? { ...i, status: 'accepted' } : i)) })),
+  declineInvite: async (inviteId) => {
+    const invite = get().invites.find((i) => i._id === inviteId);
+    set((state) => ({ invites: state.invites.map((i) => (i._id === inviteId ? { ...i, status: 'declined' } : i)) }));
+    if (invite) await declineSpaceInvite(invite.spaceId);
+  },
   markAnnounced: (inviteId) =>
-    set((state) =>
-      state.announcedIds.includes(inviteId) ? state : { announcedIds: [...state.announcedIds, inviteId] }
-    ),
+    set((state) => (state.announcedIds.includes(inviteId) ? state : { announcedIds: [...state.announcedIds, inviteId] })),
 }));
