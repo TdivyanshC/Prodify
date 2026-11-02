@@ -9,7 +9,7 @@ interface SignInScreenProps {
 export function SignInScreen({ onSwitchToSignUp }: SignInScreenProps) {
   return (
     <AuthLayout
-      sparkMessage="Welcome back ✨ Ready to focus?"
+      sparkMessage="Welcome back! Ready to focus?"
       title="Welcome back"
       subtitle="Pick up your streak, your friends and your spaces where you left them."
       googleLabel="Continue with Google"

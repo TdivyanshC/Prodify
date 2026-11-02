@@ -60,12 +60,13 @@ export const useAuthStore = create<AuthStoreState>((set, get) => ({
   googlePending: false,
   accountId: DEV_ACCOUNT,
 
-  // App launch: reuse the saved session if there is one.
+  // App launch: reuse the saved session if there is one. With auth paused,
+  // skip it (and the sign-in screen) and go straight into the dev account.
   restore: async () => {
+    if (!GOOGLE_AUTH_ENABLED) return get().signInWithDevAccount();
     const token = await loadSessionToken();
     if (!token) {
-      if (GOOGLE_AUTH_ENABLED) set({ status: 'signed-out' });
-      else await get().signInWithDevAccount();
+      set({ status: 'signed-out' });
       return;
     }
     set({ status: 'signing-in', error: null });

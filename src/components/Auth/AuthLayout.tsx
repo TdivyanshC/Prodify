@@ -1,9 +1,10 @@
+import Feather from '@expo/vector-icons/Feather';
 import type { ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GOOGLE_AUTH_ENABLED } from '../../api/config';
 import { useAuthStore } from '../../store/useAuthStore';
-import { colors, textStyles } from '../../theme';
+import { colors, radii, shadows, textStyles } from '../../theme';
 import { Mascot } from '../Mascot/Mascot';
 import { ScreenBackground } from '../ScreenBackground/ScreenBackground';
 import { DevAccountList } from './DevAccountList';
@@ -31,7 +32,13 @@ export function AuthLayout({ sparkMessage, title, subtitle, googleLabel, childre
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScreenBackground />
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <View style={styles.brand}>
+          <View style={styles.brandIcon}><Feather name="zap" size={22} color={colors.primaryLight} /></View>
+          <Text style={styles.brandName}>Prodify</Text>
+        </View>
+        <Text style={styles.tagline}>A little focus. A little company.</Text>
+        <View style={styles.card}>
         <Mascot variant="compact" messageOverride={sparkMessage} />
         <View style={styles.heading}>
           <Text style={styles.title}>{title}</Text>
@@ -43,7 +50,7 @@ export function AuthLayout({ sparkMessage, title, subtitle, googleLabel, childre
         {GOOGLE_AUTH_ENABLED ? (
           <View style={styles.actions}>
             <GoogleButton label={googleLabel} pending={pending} onPress={() => void signInWithGoogle()} />
-            {error ? <Text style={styles.error}>{error}</Text> : null}
+            {error ? <Text style={styles.error} accessibilityRole="alert">{error}</Text> : null}
             <Text style={styles.fineprint}>We only use your name, email and profile photo.</Text>
           </View>
         ) : (
@@ -54,12 +61,17 @@ export function AuthLayout({ sparkMessage, title, subtitle, googleLabel, childre
         )}
 
         {GOOGLE_AUTH_ENABLED ? (
-          <Pressable onPress={onSwitch} hitSlop={8} style={styles.switchRow}>
+          <Pressable accessibilityRole="button" disabled={pending} onPress={onSwitch} hitSlop={8} style={styles.switchRow}>
             <Text style={styles.switchPrompt}>
               {switchPrompt} <Text style={styles.switchAction}>{switchAction}</Text>
             </Text>
           </Pressable>
         ) : null}
+        </View>
+        <View style={styles.footer}>
+          <Feather name="shield" size={14} color={colors.textMuted} />
+          <Text style={styles.fineprint}>Your focus, your space, your pace.</Text>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -67,14 +79,20 @@ export function AuthLayout({ sparkMessage, title, subtitle, googleLabel, childre
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.background },
-  content: { flexGrow: 1, justifyContent: 'center', padding: 24, gap: 20, maxWidth: 480, width: '100%', alignSelf: 'center' },
-  heading: { gap: 8 },
+  content: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 16, paddingVertical: 32, gap: 16, maxWidth: 520, width: '100%', alignSelf: 'center' },
+  brand: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  brandIcon: { width: 42, height: 42, borderRadius: radii.button, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  brandName: { ...textStyles.h1, color: colors.textPrimary },
+  tagline: { ...textStyles.body, color: colors.textSecondary, textAlign: 'center', marginBottom: 8 },
+  card: { padding: 20, gap: 24, borderRadius: radii.card, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, ...shadows.card },
+  footer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
+  heading: { gap: 10 },
   title: { ...textStyles.display, color: colors.textPrimary, textAlign: 'center' },
   subtitle: { ...textStyles.body, color: colors.textSecondary, textAlign: 'center' },
   actions: { gap: 12, marginTop: 4 },
-  error: { ...textStyles.bodySmall, color: colors.warning, textAlign: 'center' },
+  error: { ...textStyles.bodySmall, color: colors.error, textAlign: 'center' },
   fineprint: { ...textStyles.caption, color: colors.textMuted, textAlign: 'center' },
-  switchRow: { alignSelf: 'center', paddingVertical: 4 },
+  switchRow: { alignSelf: 'center', minHeight: 44, justifyContent: 'center', paddingVertical: 8 },
   switchPrompt: { ...textStyles.bodySmall, color: colors.textSecondary },
   switchAction: { ...textStyles.bodySmallMedium, color: colors.primaryLight },
 });

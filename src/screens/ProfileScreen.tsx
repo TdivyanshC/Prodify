@@ -9,9 +9,10 @@ import { BadgesPreview } from '../components/Profile/BadgesPreview';
 import { ProfileHeaderCard } from '../components/Profile/ProfileHeaderCard';
 import { StatTile } from '../components/Profile/StatTile';
 import { WeeklyActivityChart } from '../components/Profile/WeeklyActivityChart';
+import { GOOGLE_AUTH_ENABLED } from '../api/config';
 import { ScreenBackground } from '../components/ScreenBackground/ScreenBackground';
 import { DESKTOP_BREAKPOINT } from '../navigation/routes';
-import { useAuthStore } from '../store/useAuthStore';
+import { SignOutButton } from '../components/Auth/SignOutButton';
 import { useCatalogStore } from '../store/useCatalogStore';
 import { useUserStore } from '../store/useUserStore';
 import { colors, fonts, radii } from '../theme';
@@ -29,7 +30,6 @@ export function ProfileScreen() {
   const activity = useUserStore((state) => state.activity);
   const weekStats = useUserStore((state) => state.weekStats);
   const badges = useCatalogStore((state) => state.badges);
-  const signOut = useAuthStore((state) => state.signOut);
 
   useEffect(() => {
     if (!user) void refreshUser().catch(() => undefined);
@@ -91,10 +91,10 @@ export function ProfileScreen() {
 
           <BadgesPreview badges={badges} earnedIds={user.badgeIds} onSeeAll={() => openPage('Achievements')} />
 
-          <Pressable onPress={signOut} style={styles.signOutRow}>
-            <Feather name="log-out" size={17} color={colors.error} />
-            <Text style={styles.signOutLabel}>Sign Out</Text>
-          </Pressable>
+          {/* Auth paused (dev mode) has no sign-in screen to land on. */}
+          {GOOGLE_AUTH_ENABLED ? (
+            <SignOutButton />
+          ) : null}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -139,22 +139,5 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyMedium,
     fontSize: 15,
     color: colors.textPrimary,
-  },
-  signOutRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: 4,
-    paddingVertical: 14,
-    borderRadius: radii.button,
-    backgroundColor: colors.surfaceMuted,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  signOutLabel: {
-    fontFamily: fonts.bodySemiBold,
-    fontSize: 14,
-    color: colors.error,
   },
 });
