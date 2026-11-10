@@ -42,7 +42,9 @@ async function main() {
 // host leaves only "exited with status 1" and no reason.
 main().catch((err: Error & { code?: number | string }) => {
   console.error(`Failed to start: ${err.name}: ${err.message}`);
-  if (err.name === 'MongoServerSelectionError' || err.name === 'MongoParseError' || err.name === 'MongoAPIError') {
+  if (err.code === 'ENOTFOUND' || /querySrv|getaddrinfo/.test(err.message)) {
+    console.error('The MongoDB hostname in MONGO_URI does not exist in DNS. Re-copy the connection string from Atlas (Connect > Drivers) - a mistyped or truncated cluster host (cluster0.xxxxx.mongodb.net) or a deleted/paused cluster causes this.');
+  } else if (err.name === 'MongoServerSelectionError' || err.name === 'MongoParseError' || err.name === 'MongoAPIError') {
     console.error('Could not reach MongoDB. Check MONGO_URI (password filled in and URL-encoded, no <angle brackets>) and that Atlas Network Access allows this host (0.0.0.0/0).');
   } else if (err.code === 13 || err.code === 18 || err.name === 'MongoServerError') {
     console.error('MongoDB rejected the credentials or permissions. The database user needs readWrite on MONGO_DB (Atlas: "Read and write to any database").');
