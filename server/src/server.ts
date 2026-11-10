@@ -10,6 +10,7 @@ import { startSimulator, stopSimulator } from './modules/dev/simulator';
 import { closeRealtime, initRealtime } from './realtime/io';
 
 async function main() {
+  logger.info(`Starting Prodify API (env: ${env.NODE_ENV}, auth: ${env.AUTH_MODE}); connecting to MongoDB…`);
   await connectDb();
   registerEventHandlers();
   await startJobs();
@@ -36,7 +37,16 @@ async function main() {
   process.on('SIGTERM', () => void shutdown('SIGTERM'));
 }
 
-main().catch((err) => {
+// Startup failures go to stderr synchronously as well as the logger: the logger
+// can lose its last line when the process exits straight after, which on a
+// host leaves only "exited with status 1" and no reason.
+main().catch((err: Error & { code?: number | string }) => {
+  console.error(`Failed to start: ${err.name}: ${err.message}`);
+  if (err.name === 'MongoServerSelectionError' || err.name === 'MongoParseError' || err.name === 'MongoAPIError') {
+    console.error('Could not reach MongoDB. Check MONGO_URI (password filled in and URL-encoded, no <angle brackets>) and that Atlas Network Access allows this host (0.0.0.0/0).');
+  } else if (err.code === 13 || err.code === 18 || err.name === 'MongoServerError') {
+    console.error('MongoDB rejected the credentials or permissions. The database user needs readWrite on MONGO_DB (Atlas: "Read and write to any database").');
+  }
   logger.fatal({ err }, 'failed to start');
   process.exit(1);
 });

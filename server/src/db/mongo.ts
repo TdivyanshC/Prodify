@@ -47,7 +47,16 @@ export async function connectDb(): Promise<Db> {
 async function ensureSchema(database: Db) {
   const existing = new Set((await database.listCollections({}, { nameOnly: true }).toArray()).map((c) => c.name));
   for (const name of COLLECTIONS) {
-    if (existing.has(name)) await database.command({ collMod: name, validator: VALIDATORS[name], validationLevel: 'strict' });
+    if (existing.has(name)) {
+      try {
+        await database.command({ collMod: name, validator: VALIDATORS[name], validationLevel: 'strict' });
+      } catch (err) {
+        // Atlas's readWrite role can create collections but not collMod them.
+        // Skipping only means validator changes need a more privileged user.
+        if ((err as { code?: number }).code !== 13) throw err;
+        logger.warn({ collection: name }, 'not authorized to update the collection validator; leaving it as is');
+      }
+    }
     else await database.createCollection(name, { validator: VALIDATORS[name], validationLevel: 'strict' });
   }
   await ensureIndexes(database);
