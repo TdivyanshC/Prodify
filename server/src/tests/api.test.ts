@@ -259,7 +259,7 @@ await step('notifications: list by category, read, snooze → redelivered as hig
 await step('settings: mute nudges → a nudge is dropped; alerts + reminders toggle', async () => {
   await ok('seed-simran', 'PATCH', '/me/notification-settings', { categories: { nudges: false }, dailyToastCap: 3 });
   const { deliver } = await import('../modules/notifications/deliver');
-  const r = await deliver({ userId: simranId, type: 'join_nudge', eventId: 'test_nudge', variants: (await import('../../../src/mocks/notificationCopy')).JOIN_NUDGE_COPY.evening, sender: { kind: 'spark' } });
+  const r = await deliver({ userId: simranId, type: 'join_nudge', eventId: 'test_nudge', variants: (await import('../shared/notificationCopy')).JOIN_NUDGE_COPY.evening, sender: { kind: 'spark' } });
   assert(r === 'muted', `got ${r}`);
   await ok('seed-simran', 'DELETE', `/me/friend-alerts/${await userId('riya.codes')}`);
   const s = await ok('seed-simran', 'GET', '/me/notification-settings');

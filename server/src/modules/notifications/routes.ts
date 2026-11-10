@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { ObjectId } from 'mongodb';
 import { z } from 'zod';
-import { mascotQuotes, type MascotQuoteCategory } from '../../../../src/mocks/mascotQuotes';
+import { mascotQuotes, type MascotQuoteCategory } from '../../shared/mascotQuotes';
 import { col } from '../../db/mongo';
 import { notFound, parseId } from '../../lib/errors';
 import { MINUTE } from '../../lib/time';

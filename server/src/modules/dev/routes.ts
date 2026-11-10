@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { JOIN_NUDGE_COPY } from '../../../../src/mocks/notificationCopy';
-import type { AppNotificationType } from '../../../../src/types/social';
+import { JOIN_NUDGE_COPY } from '../../shared/notificationCopy';
+import type { AppNotificationType } from '../../shared/social';
 import { col, getDb } from '../../db/mongo';
 import { pendingJobIds, runJobNow, stopJobs } from '../../jobs/scheduler';
 import { startJobs } from '../../jobs/index';

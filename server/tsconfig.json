@@ -13,9 +13,6 @@
     ]
   },
   "include": [
-    "src",
-    "../src/mocks/notificationCopy.ts",
-    "../src/mocks/mascotQuotes.ts",
-    "../src/types/social.ts"
+    "src"
   ]
 }

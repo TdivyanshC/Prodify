@@ -1,6 +1,6 @@
 import { MongoServerError, ObjectId } from 'mongodb';
-import { GROUPED_COPY, JOIN_NUDGE_COPY, NOTIFICATION_COPY, type CopyVariant } from '../../../../src/mocks/notificationCopy';
-import type { AppNotificationType } from '../../../../src/types/social';
+import { GROUPED_COPY, JOIN_NUDGE_COPY, NOTIFICATION_COPY, type CopyVariant } from '../../shared/notificationCopy';
+import type { AppNotificationType } from '../../shared/social';
 import { col } from '../../db/mongo';
 import type { NotificationCategory, NotificationDoc, UserDoc } from '../../db/schemas';
 import { logger } from '../../lib/logger';

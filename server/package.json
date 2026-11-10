@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "cross-env NODE_ENV=development tsx watch --clear-screen=false src/server.ts",
     "start": "tsx src/server.ts",
-    "test": "tsx src/tests/hardening.test.ts && tsx src/tests/api.test.ts && tsx src/tests/auth.test.ts",
+    "test": "tsx src/tests/selfcontained.test.ts && tsx src/tests/hardening.test.ts && tsx src/tests/api.test.ts && tsx src/tests/auth.test.ts",
     "test:auth": "tsx src/tests/auth.test.ts",
     "seed": "cross-env NODE_ENV=development tsx src/seed/run.ts",
     "seed:check": "cross-env NODE_ENV=development tsx src/seed/check.ts",

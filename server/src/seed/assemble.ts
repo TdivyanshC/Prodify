@@ -1,5 +1,5 @@
 import type { ObjectId } from 'mongodb';
-import { GROUPED_COPY, JOIN_NUDGE_COPY, NOTIFICATION_COPY, type CopyVariant } from '../../../src/mocks/notificationCopy';
+import { GROUPED_COPY, JOIN_NUDGE_COPY, NOTIFICATION_COPY, type CopyVariant } from '../shared/notificationCopy';
 import { hashInt, oid } from '../lib/ids';
 import { creditThreshold, levelFor, pairKey, stageFor, TOGETHER_MIN_OVERLAP_MIN } from '../lib/rules';
 import { addDays, addMinutes, DAY, dayKey, localHour, MINUTE, minutesBetween, weekStart, zonedTime } from '../lib/time';
