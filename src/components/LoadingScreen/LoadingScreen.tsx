@@ -1,5 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { colors, fonts, gradients } from '../../theme';
 
@@ -14,6 +14,13 @@ export function LoadingScreen() {
   const dot1 = useRef(new Animated.Value(0.3)).current;
   const dot2 = useRef(new Animated.Value(0.3)).current;
   const dot3 = useRef(new Animated.Value(0.3)).current;
+  // A sleeping free-tier server can take up to a minute to wake; say so
+  // instead of leaving the user staring at dots.
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setSlow(true), 6000);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -70,6 +77,7 @@ export function LoadingScreen() {
         <Animated.View style={[styles.dot, { opacity: dot2 }]} />
         <Animated.View style={[styles.dot, { opacity: dot3 }]} />
       </View>
+      {slow ? <Text style={styles.slow}>Waking things up… the first start can take up to a minute.</Text> : null}
     </View>
   );
 }
@@ -117,6 +125,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 7,
     marginTop: 6,
+  },
+  slow: {
+    fontFamily: fonts.bodyRegular,
+    fontSize: 13,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    paddingHorizontal: 32,
   },
   dot: {
     width: 6,

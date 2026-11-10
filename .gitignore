@@ -42,3 +42,6 @@ yarn-error.*
 
 # logs
 *.log
+
+# local secrets (Atlas connection string etc.)
+env

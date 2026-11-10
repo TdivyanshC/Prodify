@@ -5,14 +5,14 @@
   "type": "module",
   "description": "Prodify Phase 2 backend. Only the dev seed exists so far; see docs/phase2-backend-architecture.md.",
   "scripts": {
-    "dev": "tsx watch --clear-screen=false src/server.ts",
+    "dev": "cross-env NODE_ENV=development tsx watch --clear-screen=false src/server.ts",
     "start": "tsx src/server.ts",
-    "test": "tsx src/tests/api.test.ts && tsx src/tests/auth.test.ts",
+    "test": "tsx src/tests/hardening.test.ts && tsx src/tests/api.test.ts && tsx src/tests/auth.test.ts",
     "test:auth": "tsx src/tests/auth.test.ts",
-    "seed": "tsx src/seed/run.ts",
-    "seed:check": "tsx src/seed/check.ts",
-    "seed:dump": "tsx src/seed/dump.ts",
-    "seed:verify": "tsx src/seed/verifyMongo.ts",
+    "seed": "cross-env NODE_ENV=development tsx src/seed/run.ts",
+    "seed:check": "cross-env NODE_ENV=development tsx src/seed/check.ts",
+    "seed:dump": "cross-env NODE_ENV=development tsx src/seed/dump.ts",
+    "seed:verify": "cross-env NODE_ENV=development tsx src/seed/verifyMongo.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -23,16 +23,17 @@
     "mongodb": "^6.21.0",
     "pino": "^10.4.0",
     "socket.io": "^4.8.4",
+    "tsx": "^4.23.15",
     "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^26.6.4",
+    "cross-env": "^10.1.0",
     "mongodb-memory-server": "^11.3.0",
     "pino-pretty": "^13.2.0",
     "socket.io-client": "^4.8.4",
-    "tsx": "^4.23.15",
     "typescript": "~6.0.3"
   }
 }

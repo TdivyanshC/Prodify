@@ -17,6 +17,8 @@ npm run seed          # wipe + seed MONGO_URI (localhost only)
 `EXPO_PUBLIC_API_URL=http://<LAN-IP>:4000` for Expo instead. The app signs in as `seed-simran`; set `EXPO_PUBLIC_DEV_ACCOUNT` to use another
 seed account.
 
+**Secure by default:** `NODE_ENV` defaults to `production` and `AUTH_MODE` to `google`, so an unconfigured deploy has no dev tokens and no `/v1/dev`. `npm run dev` and the seed scripts set `NODE_ENV=development` themselves. In production the server won't boot without `MONGO_URI`, `JWT_SECRET`, `GOOGLE_WEB_CLIENT_ID` and `GOOGLE_ANDROID_CLIENT_ID`.
+
 **Dev auth:** `Authorization: Bearer dev:<firebaseUid>`, for example `dev:seed-simran`. `GET /v1/dev/accounts` lists the seed accounts, and
 `POST /v1/dev/reset` reseeds relative to now. Production refuses dev auth (`AUTH_MODE=google` is required).
 

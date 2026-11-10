@@ -19,7 +19,8 @@ type DeviceInfo = { timezone: string; deviceId: string; platform: string };
 
 // Dev accounts only (server AUTH_MODE=dev) — the dev:<uid> token is already set.
 export function startAuthSession(input: DeviceInfo) {
-  return api.post<AuthSessionResponse>('/auth/session', input);
+  // Idempotent upsert, so it can retry through a cold-starting server.
+  return api.post<AuthSessionResponse>('/auth/session', input, { retry: true });
 }
 
 // Trades a Google ID token for a Prodify session token.

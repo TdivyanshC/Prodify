@@ -16,7 +16,12 @@ export async function connectDb(): Promise<Db> {
   if (!uri) {
     // Transactions (session close) need a replica set, so the dev fallback is one.
     const { MongoMemoryReplSet } = await import('mongodb-memory-server');
-    const replSet = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
+    const replSet = await MongoMemoryReplSet.create({
+      // The default 10s launch limit is too short for a cold start on Windows
+      // (antivirus scans the freshly downloaded mongod on first run).
+      replSet: { count: 1 },
+      instanceOpts: [{ launchTimeout: 60_000 }],
+    });
     uri = replSet.getUri();
     stopMemory = () => replSet.stop();
     inMemory = true;

@@ -3,6 +3,7 @@ import { ObjectId } from 'mongodb';
 import { Server, type Socket } from 'socket.io';
 import { env } from '../config/env';
 import { col } from '../db/mongo';
+import { AppError } from '../lib/errors';
 import { logger } from '../lib/logger';
 import { resolveUserFromToken } from '../middleware/auth';
 import { presence } from './presence';
@@ -30,7 +31,11 @@ export function initRealtime(server: HttpServer) {
       socket.data.userId = user._id.toHexString();
       next();
     } catch (err) {
-      next(err as Error);
+      // `data` reaches the client as connect_error.data, so the app can tell a
+      // dead token (sign out) from a flaky network (keep retrying).
+      const rejected = new Error((err as Error).message) as Error & { data?: { status: number } };
+      rejected.data = { status: err instanceof AppError ? err.status : 500 };
+      next(rejected);
     }
   });
 

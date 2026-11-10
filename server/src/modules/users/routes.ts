@@ -51,7 +51,10 @@ authRoutes.post(
 // or update the account, and return a Prodify session token for this device.
 authRoutes.post(
   '/google',
-  rateLimit('auth_ip', 3000, 60_000, (req) => `ip:${req.ip}`),
+  // Signing in is rare (once per install or after a sign-out) but each call
+  // fetches/verifies a Google token, so this is far tighter than /session.
+  // Keyed apart from /session's limiter so the two budgets don't mix.
+  rateLimit('auth_google_ip', 60, 60_000, (req) => `ip:${req.ip}`),
   validate(deviceSchema.extend({ idToken: z.string().min(1) })),
   async (req, res) => {
     const google = await verifyGoogleIdToken(req.body.idToken);

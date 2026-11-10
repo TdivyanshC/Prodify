@@ -1,8 +1,8 @@
 import { Platform } from 'react-native';
 import { create } from 'zustand';
-import { ApiError, getAuthToken, setAuthToken } from '../api/client';
+import { ApiError, getAuthToken, setAuthToken, setUnauthorizedHandler } from '../api/client';
 import { DEV_ACCOUNT, GOOGLE_AUTH_ENABLED } from '../api/config';
-import { connectRealtime, disconnectRealtime } from '../api/realtime';
+import { connectRealtime, disconnectRealtime, setSessionRejectedHandler } from '../api/realtime';
 import { getGoogleIdToken, GoogleSignInCancelled, signOutOfGoogle } from '../auth/googleSignIn';
 import { getDeviceId, loadSessionToken, saveSessionToken } from '../auth/tokenStorage';
 import { logout, signInWithGoogleIdToken, startAuthSession } from '../services/userService';
@@ -138,6 +138,30 @@ export const useAuthStore = create<AuthStoreState>((set, get) => ({
     set({ status: 'signed-out', isAuthenticated: false, error: null });
   },
 }));
+
+// A token that was good and then stopped being (30-day expiry, revoked from
+// another device, account disabled): drop it and go back to sign-in instead of
+// leaving the app on stale data. Only acts on a live session - sign-in flows
+// handle their own failures - and the flag stops a burst of failing requests
+// from running it more than once.
+let endingSession = false;
+async function endRejectedSession() {
+  const { status } = useAuthStore.getState();
+  if (endingSession || status !== 'ready') return;
+  endingSession = true;
+  try {
+    setAuthToken(null);
+    disconnectRealtime();
+    await saveSessionToken(null);
+    await signOutOfGoogle().catch(() => undefined);
+    resetUserData();
+    useAuthStore.setState({ status: 'signed-out', isAuthenticated: false, error: 'Your session ended. Please sign in again.' });
+  } finally {
+    endingSession = false;
+  }
+}
+setUnauthorizedHandler(() => void endRejectedSession());
+setSessionRejectedHandler(() => void endRejectedSession());
 
 // Loads every store for the signed-in user, then opens the socket.
 async function bootstrap(user: User) {

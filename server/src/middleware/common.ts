@@ -21,19 +21,32 @@ export function requestId(req: Request, res: Response, next: NextFunction) {
 
 // Sliding-window limiter per user (or IP before auth). In-process store;
 // the Redis store (rate-limiter-flexible) drops in for multi-instance.
-const windows = new Map<string, number[]>();
+// Each entry remembers its window so a periodic sweep can drop keys whose
+// hits have all expired - otherwise every user/IP ever seen stays in memory.
+const windows = new Map<string, { hits: number[]; windowMs: number }>();
+const SWEEP_MS = 60_000;
+export function sweepRateLimits(now = Date.now()) {
+  for (const [key, entry] of windows) {
+    const newest = entry.hits[entry.hits.length - 1];
+    if (newest === undefined || now - newest >= entry.windowMs) windows.delete(key);
+  }
+}
+const sweeper = setInterval(sweepRateLimits, SWEEP_MS);
+sweeper.unref();
+export const rateLimitKeyCount = () => windows.size;
+
 export function rateLimit(name: string, limit: number, windowMs: number, keyOf?: (req: Request) => string | undefined): RequestHandler {
   return (req, _res, next) => {
     const who = keyOf?.(req) ?? req.user?._id.toHexString() ?? req.ip ?? 'anon';
     const key = `${name}:${who}`;
     const now = Date.now();
-    const hits = (windows.get(key) ?? []).filter((t) => now - t < windowMs);
+    const hits = (windows.get(key)?.hits ?? []).filter((t) => now - t < windowMs);
     if (hits.length >= limit) {
       logger.warn({ key }, 'rate limit tripped');
       throw tooMany();
     }
     hits.push(now);
-    windows.set(key, hits);
+    windows.set(key, { hits, windowMs });
     next();
   };
 }

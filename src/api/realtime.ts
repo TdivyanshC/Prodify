@@ -17,6 +17,10 @@ import { API_URL } from './config';
 // (debounced, so a burst of joins is one request).
 
 let socket: Socket | null = null;
+let onSessionRejected: (() => void) | null = null;
+export function setSessionRejectedHandler(fn: (() => void) | null) {
+  onSessionRejected = fn;
+}
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
 
 function debounce(key: string, ms: number, fn: () => void) {
@@ -42,6 +46,15 @@ export function connectRealtime(token: string) {
   disconnectRealtime();
   socket = io(API_URL, { auth: { token }, transports: ['websocket'], reconnectionDelayMax: 10_000 });
 
+  // A rejected token (expired, revoked, account disabled) won't fix itself by
+  // retrying; a network error will, so only auth rejections end the session.
+  socket.on('connect_error', (err: Error & { data?: { status?: number } }) => {
+    const status = err.data?.status;
+    if (status === 401 || status === 403) {
+      socket?.disconnect();
+      onSessionRejected?.();
+    }
+  });
   socket.on('notification:new', ({ notification, delivery }: { notification: AppNotification; delivery: 'toast' | 'inbox' | 'held' }) => {
     useNotificationStore.getState().receive(notification, delivery);
     if (delivery === 'held') useFocusModeStore.getState().hold(notification._id);
