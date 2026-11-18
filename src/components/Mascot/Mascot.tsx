@@ -165,7 +165,9 @@ export function Mascot({ variant = 'full', messageOverride, mood = 'idle' }: Mas
       <BlurView
         intensity={40}
         tint="dark"
-        blurMethod="dimezisBlurView"
+        // Android: the native blur needs a blurTarget this tree does not provide (it warns and
+        // renders nothing useful), so use the translucent fallback. iOS ignores this prop.
+        blurMethod="none"
         style={StyleSheet.absoluteFill}
       />
       <View style={styles.bubbleOverlay} />

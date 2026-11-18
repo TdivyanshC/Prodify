@@ -8,7 +8,6 @@ import {
   Animated,
   Easing,
   KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -195,7 +194,7 @@ export function CreateSessionModal() {
       </Animated.View>
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior="padding"
         style={styles.sheetOuter}
         pointerEvents="box-none"
       >
@@ -371,7 +370,7 @@ export function CreateSessionModal() {
                     <View style={styles.reviewMetaRow}>
                       <View style={styles.reviewMetaChip}>
                         <Text style={styles.reviewMetaText}>
-                          {selectedCategory?.icon} {selectedCategory?.name}
+                          {selectedCategory?.name ?? ''}
                         </Text>
                       </View>
                       <View style={styles.reviewMetaChip}>

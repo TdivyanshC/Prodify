@@ -60,16 +60,20 @@ export function SessionRoomScreen({ route, navigation }: Props) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const reactionCounts = useReactionStore((s) => s.roomCounts[sessionId]) ?? { clap: 0, fire: 0, fist_bump: 0 };
 
+  // The clock is the viewer's own clocked time (their session in this space),
+  // not the space's age: a space can be running for an hour before someone
+  // joins, and only their own minutes earn XP and streak credit. Falls back to
+  // the space's start for the host / before the participant row has arrived.
+  const myJoinedAt = session?.participants.find((p) => p.userId === user?._id && !p.leftAt)?.joinedAt;
+  const clockStart = myJoinedAt ?? session?.startTime;
   useEffect(() => {
-    if (!session) return;
-    const tick = () => {
-      const elapsed = Math.max(0, Math.floor((Date.now() - new Date(session.startTime).getTime()) / 1000));
-      setElapsedSeconds(elapsed);
-    };
+    if (!clockStart) return;
+    const startMs = new Date(clockStart).getTime();
+    const tick = () => setElapsedSeconds(Math.max(0, Math.floor((Date.now() - startMs) / 1000)));
     tick();
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [session]);
+  }, [clockStart]);
 
   if (!session || !user) {
     return (
