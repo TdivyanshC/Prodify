@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { colors, fonts, radii, shadows } from '../../theme';
 import { getDayStatus, type DayStatus } from '../../utils/activityHelpers';
@@ -14,7 +14,8 @@ interface ActivityHeatmapProps {
   targetMinutes: number;
 }
 
-const CELL = 13;
+const CELL = 13; // minimum cell size; grows to fill wider cards
+const MAX_CELL = 24;
 const CELL_GAP = 4;
 const DAY_LABEL_WIDTH = 22;
 // GitHub-style sparse labeling — only every other row so the column
@@ -48,6 +49,7 @@ function statusColor(status: DayStatus): string {
 // full-year strip doesn't fit on a phone at readable cell size.
 export function ActivityHeatmap({ data, targetMinutes }: ActivityHeatmapProps) {
   const scrollRef = useRef<ScrollView>(null);
+  const [innerWidth, setInnerWidth] = useState(0);
 
   if (data.length === 0) return null;
 
@@ -77,6 +79,11 @@ export function ActivityHeatmap({ data, targetMinutes }: ActivityHeatmapProps) {
     return MONTH_LABELS[month];
   });
 
+  // Grow the cells so a short history still fills the card on tablets; on a phone the
+  // strip is wider than the card, so this stays at the minimum and the strip scrolls.
+  const fitted = innerWidth > 0 ? (innerWidth - DAY_LABEL_WIDTH - CELL_GAP * weeks.length) / weeks.length : CELL;
+  const cell = Math.max(CELL, Math.min(MAX_CELL, Math.floor(fitted)));
+
   const activeDays = data.filter((d) => d.totalMinutes > 0).length;
 
   return (
@@ -87,6 +94,7 @@ export function ActivityHeatmap({ data, targetMinutes }: ActivityHeatmapProps) {
       </View>
 
       <ScrollView
+        onLayout={(e) => setInnerWidth(e.nativeEvent.layout.width)}
         ref={scrollRef}
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -96,7 +104,7 @@ export function ActivityHeatmap({ data, targetMinutes }: ActivityHeatmapProps) {
           <View style={styles.gridRow}>
             <View style={styles.dayLabelColumn}>
               {DAY_LABELS.map((label, i) => (
-                <Text key={i} style={styles.dayLabel}>
+                <Text key={i} style={[styles.dayLabel, { height: cell, lineHeight: cell }]} numberOfLines={1}>
                   {label}
                 </Text>
               ))}
@@ -109,6 +117,8 @@ export function ActivityHeatmap({ data, targetMinutes }: ActivityHeatmapProps) {
                     style={[
                       styles.cell,
                       {
+                        width: cell,
+                        height: cell,
                         backgroundColor: day
                           ? statusColor(getDayStatus(day.totalMinutes, targetMinutes))
                           : 'transparent',
@@ -123,9 +133,11 @@ export function ActivityHeatmap({ data, targetMinutes }: ActivityHeatmapProps) {
           <View style={styles.monthRow}>
             <View style={styles.dayLabelSpacer} />
             {monthLabels.map((label, wi) => (
-              <Text key={wi} style={styles.monthLabel}>
-                {label}
-              </Text>
+              <View key={wi} style={{ width: cell }}>
+                <Text style={styles.monthLabel} numberOfLines={1}>
+                  {label}
+                </Text>
+              </View>
             ))}
           </View>
         </View>
@@ -199,8 +211,8 @@ const styles = StyleSheet.create({
     width: DAY_LABEL_WIDTH,
   },
   monthLabel: {
-    width: CELL,
-    flexShrink: 0,
+    // Wider than its column on purpose: the name overflows rightwards instead of wrapping.
+    width: 40,
     fontFamily: fonts.bodyMedium,
     fontSize: 9.5,
     color: colors.textSecondary,

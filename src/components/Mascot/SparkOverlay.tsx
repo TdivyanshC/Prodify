@@ -1,6 +1,6 @@
 import { BlurView } from 'expo-blur';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Dimensions, Easing, Modal, Pressable, StyleSheet, Text } from 'react-native';
+import { Animated, Dimensions, Easing, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { mascotQuotes } from '../../mocks/mascotQuotes';
 import { SPARK_EVENT_MOOD, SPARK_EVENT_QUOTE_CATEGORY, useSparkOverlayStore } from '../../store/useSparkOverlayStore';
 import { colors, fonts } from '../../theme';
@@ -98,14 +98,13 @@ export function SparkOverlay() {
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={runExit}>
       <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
-        <BlurView
-          intensity={50}
-          tint="dark"
-          // Android: the native blur needs a blurTarget this tree does not provide (it warns and
-        // renders nothing useful), so use the translucent fallback. iOS ignores this prop.
-        blurMethod="none"
-          style={StyleSheet.absoluteFill}
-        />
+        {Platform.OS === 'android' ? (
+          // Android: the native blur needs a blurTarget this tree doesn't provide, so use a plain
+          // dim — visible enough that it's clear the screen is a popup waiting for a tap.
+          <View style={[StyleSheet.absoluteFill, styles.androidDim]} />
+        ) : (
+          <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
+        )}
       </Animated.View>
 
       <Pressable style={styles.tapCatcher} onPress={handleTap}>
@@ -121,6 +120,9 @@ export function SparkOverlay() {
 const styles = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFill,
+  },
+  androidDim: {
+    backgroundColor: 'rgba(3, 12, 11, 0.72)',
   },
   tapCatcher: {
     flex: 1,

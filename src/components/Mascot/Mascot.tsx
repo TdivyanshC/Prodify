@@ -177,7 +177,7 @@ export function Mascot({ variant = 'full', messageOverride, mood = 'idle' }: Mas
         ) : (
           <Text
             style={[styles.message, variant === 'compact' && styles.messageCompact]}
-            numberOfLines={variant === 'compact' ? 2 : undefined}
+            numberOfLines={variant === 'compact' ? 3 : undefined}
           >
             {displayText}
           </Text>
