@@ -26,6 +26,12 @@
       "expo-font",
       "expo-asset",
       "expo-secure-store"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "f1758d97-0755-4835-879d-63c8c8c83948"
+      }
+    },
+    "owner": "tdivyanshc"
   }
 }
