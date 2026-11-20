@@ -32,8 +32,11 @@ export async function verifyGoogleIdToken(idToken: string): Promise<GoogleIdenti
     throw unauthorized('Google sign-in could not be verified');
   }
   // Native Android sign-in sets azp to the Android client; web sign-in to the web one.
-  const allowedAzp = [env.GOOGLE_WEB_CLIENT_ID, env.GOOGLE_ANDROID_CLIENT_ID].filter(Boolean);
-  if (env.GOOGLE_ANDROID_CLIENT_ID && payload.azp && !allowedAzp.includes(payload.azp as string)) {
+  // GOOGLE_ANDROID_CLIENT_ID may list several clients, comma-separated (e.g. the debug-key and
+  // the release-key OAuth clients).
+  const androidClients = (env.GOOGLE_ANDROID_CLIENT_ID ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  const allowedAzp = [env.GOOGLE_WEB_CLIENT_ID, ...androidClients].filter(Boolean);
+  if (androidClients.length > 0 && payload.azp && !allowedAzp.includes(payload.azp as string)) {
     throw unauthorized('Google sign-in came from an unknown client');
   }
   if (!payload.sub || typeof payload.email !== 'string' || payload.email_verified !== true) {
