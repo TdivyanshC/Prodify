@@ -2,6 +2,7 @@ import { MongoClient, type ClientSession, type Collection, type Db } from 'mongo
 import { env } from '../config/env';
 import { logger } from '../lib/logger';
 import { COLLECTIONS } from '../seed/assemble';
+import { BADGES, CATEGORIES } from '../seed/fixtures';
 import { seedDatabase } from '../seed/write';
 import { ensureIndexes } from './indexes';
 import { VALIDATORS, type CollectionName, type Collections } from './schemas';
@@ -60,6 +61,27 @@ async function ensureSchema(database: Db) {
     else await database.createCollection(name, { validator: VALIDATORS[name], validationLevel: 'strict' });
   }
   await ensureIndexes(database);
+  await ensureCatalogs(database);
+}
+
+// The 8 themes and the badge list are product reference data, not fake data, so every
+// environment needs them — including production, which never seeds the dev cast.
+// Upserting by _id keeps this safe to run on every boot.
+async function ensureCatalogs(database: Db) {
+  await database.collection('sessionCategories').bulkWrite(
+    CATEGORIES.map((c, i) => ({
+      updateOne: {
+        filter: { _id: c.legacyId as never },
+        update: { $setOnInsert: { name: c.name, sortOrder: i, icon: c.icon, isCustom: false, createdBy: null } },
+        upsert: true,
+      },
+    })),
+  );
+  await database.collection('badges').bulkWrite(
+    BADGES.map(({ key, ...b }) => ({
+      updateOne: { filter: { _id: key as never }, update: { $setOnInsert: { key, ...b } }, upsert: true },
+    })),
+  );
 }
 
 export function getDb(): Db {
