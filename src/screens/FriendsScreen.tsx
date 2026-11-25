@@ -1,7 +1,7 @@
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Header } from '../components/AppShell/Header';
 import { Card } from '../components/Card/Card';
@@ -14,7 +14,7 @@ import { DESKTOP_BREAKPOINT, type RootStackParamList } from '../navigation/route
 import { useFriendsStore } from '../store/useFriendsStore';
 import { usePopupStore } from '../store/usePopupStore';
 import { usePeopleStore } from '../store/usePeopleStore';
-import { getSuggestions } from '../services/friendService';
+import { getSuggestions, searchUsers } from '../services/friendService';
 import type { FriendProfile } from '../types/social';
 import { useUserStore } from '../store/useUserStore';
 import { colors, fonts } from '../theme';
@@ -41,6 +41,26 @@ export function FriendsScreen() {
 
   const [suggestions, setSuggestions] = useState<FriendProfile[]>([]);
   const profiles = usePeopleStore((state) => state.profiles);
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<FriendProfile[] | null>(null);
+
+  // Find a person by @handle (GET /users/search — prefix match, debounced).
+  useEffect(() => {
+    const q = query.trim().replace(/^@/, '');
+    if (q.length < 2) {
+      setResults(null);
+      return;
+    }
+    const t = setTimeout(() => {
+      searchUsers(q)
+        .then(({ items }) => {
+          usePeopleStore.getState().upsert(items);
+          setResults(items);
+        })
+        .catch(() => setResults([]));
+    }, 350);
+    return () => clearTimeout(t);
+  }, [query]);
 
   useEffect(() => {
     if (friendships.length === 0) void refresh().catch(() => undefined);
@@ -101,6 +121,36 @@ export function FriendsScreen() {
       <Header title="Friends" avatarInitial={user?.displayName?.[0]} />
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={[styles.inner, isDesktop && styles.innerDesktop]}>
+          <View style={styles.section}>
+            <Text style={styles.eyebrow}>FIND FRIENDS</Text>
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Search by @handle"
+              placeholderTextColor={colors.textMuted}
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={styles.search}
+            />
+            {user?.handle ? <Text style={styles.hint}>Your handle is @{user.handle} — share it so friends can find you.</Text> : null}
+            {results !== null ? (
+              results.length === 0 ? (
+                <Text style={styles.hint}>No one found with that handle.</Text>
+              ) : (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.suggestedRow}>
+                  {results.map((profile) => (
+                    <SuggestedFriendCard
+                      key={profile._id}
+                      profile={profile}
+                      requested={outgoingRequestedIds.has(profile._id) || acceptedFriendships.some((f) => getOtherUserId(f, user?._id) === profile._id)}
+                      onAdd={() => handleAdd(profile._id, profile.displayName)}
+                    />
+                  ))}
+                </ScrollView>
+              )
+            ) : null}
+          </View>
+
           {incomingRequests.length > 0 ? (
             <View style={styles.section}>
               <Text style={styles.eyebrow}>FRIEND REQUESTS · {incomingRequests.length}</Text>
@@ -191,6 +241,22 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodySemiBold,
     fontSize: 11.5,
     letterSpacing: 0.6,
+    color: colors.textSecondary,
+  },
+  search: {
+    height: 46,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 14,
+    fontFamily: fonts.bodyRegular,
+    fontSize: 15,
+    color: colors.textPrimary,
+  },
+  hint: {
+    fontFamily: fonts.bodyRegular,
+    fontSize: 12.5,
     color: colors.textSecondary,
   },
   requestList: {

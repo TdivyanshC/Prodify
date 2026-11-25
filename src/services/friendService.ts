@@ -13,5 +13,6 @@ export const acceptFriendRequest = (friendshipId: string) => api.post<{ friendsh
 export const declineFriendRequest = (friendshipId: string) => api.post(`/friendships/${friendshipId}/decline`);
 export const removeFriendship = (friendshipId: string) => api.del(`/friendships/${friendshipId}`);
 export const getSuggestions = () => api.get<{ items: (FriendProfile & { mutualCount: number })[] }>('/friends/suggestions');
+export const searchUsers = (handle: string) => api.get<{ items: FriendProfile[] }>(`/users/search?handle=${encodeURIComponent(handle)}`);
 export const getProfile = (userId: string) => api.get<ProfileResponse>(`/users/${userId}/profile`);
 export const blockUser = (userId: string) => api.post('/blocks', { userId });

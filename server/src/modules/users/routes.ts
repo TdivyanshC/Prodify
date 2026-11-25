@@ -82,8 +82,15 @@ async function signIn(
   const isNew = !user;
   if (!user) {
     user = newUser(uid, google, body.timezone ?? 'UTC', now);
+    user.handle = await uniqueHandle(user.displayName);
     await col('users').insertOne(user);
   } else {
+    // Accounts created before handles were assigned get one now, so friends can find them.
+    if (!user.handle) {
+      const handle = await uniqueHandle(user.displayName);
+      await col('users').updateOne({ _id: user._id, handle: null }, { $set: { handle } });
+      user.handle = handle;
+    }
     if (user.status !== 'active') throw forbidden('ACCOUNT_' + user.status.toUpperCase(), `This account is ${user.status}`);
     const daysAway = (now.getTime() - user.lastActiveAt.getTime()) / DAY;
     if (daysAway >= 3) {
@@ -121,6 +128,16 @@ async function signIn(
     { upsert: true, returnDocument: 'after' }
   );
   return { user, isNew, authSessionId: session!._id };
+}
+
+// A readable, unique @handle: the display name squashed to [a-z0-9] plus a short number.
+async function uniqueHandle(displayName: string): Promise<string> {
+  const base = displayName.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 12) || 'user';
+  for (let i = 0; i < 8; i++) {
+    const handle = `${base}${Math.floor(1000 + Math.random() * 9000)}`;
+    if (!(await col('users').countDocuments({ handle }))) return handle;
+  }
+  return `${base}${Date.now().toString(36)}`.slice(0, 20);
 }
 
 function newUser(uid: string, google: Partial<GoogleIdentity>, timezone: string, now: Date): UserDoc {

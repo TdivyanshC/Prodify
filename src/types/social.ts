@@ -6,6 +6,7 @@
 export interface FriendProfile {
   _id: string;
   displayName: string;
+  handle?: string | null;
   avatarInitial: string;
   tagline: string;
   favoriteCategoryIcon: string;

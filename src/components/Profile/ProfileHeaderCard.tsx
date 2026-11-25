@@ -26,6 +26,7 @@ export function ProfileHeaderCard({ user }: ProfileHeaderCardProps) {
       </View>
 
       <Text style={styles.name}>{user.displayName}</Text>
+      {user.handle ? <Text style={styles.handle}>@{user.handle}</Text> : null}
       <Text style={styles.memberSince}>Member since {formatMemberSince(user.createdAt)}</Text>
 
       <View style={styles.mascotPill}>
@@ -39,6 +40,7 @@ export function ProfileHeaderCard({ user }: ProfileHeaderCardProps) {
 const AVATAR_SIZE = 76;
 
 const styles = StyleSheet.create({
+  handle: { fontFamily: fonts.bodyMedium, fontSize: 14, color: colors.primaryLight, marginTop: 2 },
   card: {
     borderRadius: 24,
     borderWidth: 1,
