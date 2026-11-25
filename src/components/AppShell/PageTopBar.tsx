@@ -23,7 +23,7 @@ export function PageTopBar({ title, stacked, avatarInitial }: PageTopBarProps) {
         <Feather name="arrow-left" size={19} color={colors.textSecondary} />
       </Pressable>
       <Text style={styles.title}>{title}</Text>
-      <View style={styles.backButton} />
+      <View style={[styles.backButton, styles.spacer]} />
     </View>
   );
 }
@@ -43,6 +43,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.surface,
+  },
+  spacer: {
+    backgroundColor: 'transparent',
   },
   title: {
     fontFamily: fonts.headingSemiBold,

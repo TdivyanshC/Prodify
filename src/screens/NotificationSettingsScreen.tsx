@@ -58,7 +58,7 @@ export function NotificationSettingsScreen({ navigation }: Props) {
           <Feather name="arrow-left" size={19} color={colors.textSecondary} />
         </Pressable>
         <Text style={styles.topBarTitle}>Notification settings</Text>
-        <View style={styles.iconButton} />
+        <View style={[styles.iconButton, styles.spacer]} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -239,6 +239,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.surface,
+  },
+  spacer: {
+    backgroundColor: 'transparent',
   },
   topBarTitle: {
     fontFamily: fonts.headingSemiBold,

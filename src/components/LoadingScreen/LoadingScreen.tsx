@@ -120,6 +120,8 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: colors.textPrimary,
     letterSpacing: 0.2,
+    width: 160,
+    textAlign: 'center',
   },
   dotsRow: {
     flexDirection: 'row',
