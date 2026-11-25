@@ -49,6 +49,7 @@ export function HomeScreen() {
   const refreshSessions = useSessionStore((state) => state.refresh);
   const joinSession = useSessionStore((state) => state.joinSession);
   const showSpark = useSparkOverlayStore((state) => state.showSpark);
+  const sparkOpen = useSparkOverlayStore((state) => state.visible);
   const openCreateModal = useCreateSessionModalStore((state) => state.open);
   const friendships = useFriendsStore((state) => state.friendships);
   const friendsLoaded = useFriendsStore((state) => state.hasLoaded);
@@ -254,7 +255,8 @@ export function HomeScreen() {
         </View>
       </ScrollView>
 
-      <View style={styles.peekWrap}>
+      {/* Hidden while the full popup is open, so there aren't two Sparks on screen at once. */}
+      <View style={[styles.peekWrap, sparkOpen && { opacity: 0 }]}>
         <SparkPeek onPress={handlePeekPress} />
       </View>
     </SafeAreaView>

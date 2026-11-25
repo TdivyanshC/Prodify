@@ -121,6 +121,8 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     letterSpacing: 0.2,
     width: 160,
+    lineHeight: 28,
+    paddingBottom: 2,
     textAlign: 'center',
   },
   dotsRow: {
