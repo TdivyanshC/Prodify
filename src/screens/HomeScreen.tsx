@@ -1,10 +1,12 @@
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import * as SecureStore from 'expo-secure-store';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FriendsLiveNudge } from '../components/Home/FriendsLiveNudge';
+import { RunAgainCard } from '../components/Home/RunAgainCard';
 import { HomeHeader } from '../components/Home/HomeHeader';
 import { StreakSpotlight } from '../components/Home/StreakSpotlight';
 import { SparkPeek } from '../components/Mascot/SparkPeek';
@@ -25,6 +27,8 @@ import { getFriendProfile, getOtherUserId } from '../utils/friendHelpers';
 import { getFocusingFriendIds, isUserInSession } from '../utils/sessionHelpers';
 import type { FriendProfile } from '../types/social';
 import { pickRandomSessionQuote } from '../utils/sessionQuotePool';
+import { getSessionHistory } from '../services/userService';
+import type { SessionHistoryItem } from '../api/types';
 import { colors, fonts, gradients, radii } from '../theme';
 
 // Wireframe (primary layout reference for this screen): Greeting -> Daily
@@ -49,6 +53,13 @@ export function HomeScreen() {
   const friendships = useFriendsStore((state) => state.friendships);
   const friendsLoaded = useFriendsStore((state) => state.hasLoaded);
   const refreshFriends = useFriendsStore((state) => state.refresh);
+  // The last finished session, for the "Run again" shortcut.
+  const [lastRun, setLastRun] = useState<SessionHistoryItem | null>(null);
+  useEffect(() => {
+    getSessionHistory(5)
+      .then(({ items }) => setLastRun(items.find((i) => i.status === 'completed') ?? null))
+      .catch(() => undefined);
+  }, [sessionsCompletedTotal]);
   const hasUnreadNotifications = useNotificationStore((state) => state.notifications.some((n) => !n.openedAt));
 
   // Refs, not state: flipping a state flag re-ran the effect below, and
@@ -91,9 +102,11 @@ export function HomeScreen() {
     hasAutoTriggered.current = true;
 
     const streak = user.streak.current;
+    // Only people who have been active before can be "away" — a brand-new account has no last
+    // active day, and must not be told "I haven't seen you in a while".
     const daysSinceActive = user.streak.lastActiveDate
       ? (Date.now() - new Date(user.streak.lastActiveDate).getTime()) / (1000 * 60 * 60 * 24)
-      : Infinity;
+      : 0;
 
     let eventKey: SparkEventKey | null = null;
     let vars: Record<string, string | number> = {};
@@ -112,7 +125,15 @@ export function HomeScreen() {
 
     if (eventKey) {
       const key = eventKey;
-      autoTriggerTimer.current = setTimeout(() => showSpark(key, vars), 500);
+      // At most one unprompted Spark per day: reopening the app shouldn't re-greet every time.
+      const today = new Date().toDateString();
+      void SecureStore.getItemAsync('spark_last_auto')
+        .catch(() => null)
+        .then((last) => {
+          if (last === today) return;
+          void SecureStore.setItemAsync('spark_last_auto', today).catch(() => undefined);
+          autoTriggerTimer.current = setTimeout(() => showSpark(key, vars), 500);
+        });
     }
   }, [user, friendsLoaded, sessions.length, focusingFriends, showSpark]);
 
@@ -202,6 +223,24 @@ export function HomeScreen() {
                   onStart={() => handleStartSession(session)}
                 />
               ))}
+            </View>
+          ) : null}
+
+          {lastRun && activeSessions.length === 0 ? (
+            <View style={styles.sessionsContainer}>
+              <Text style={styles.sectionLabel}>PICK UP WHERE YOU LEFT OFF</Text>
+              <RunAgainCard
+                name={lastRun.spaceName ?? `${getCategory(lastRun.categoryId)?.name ?? 'Focus'} session`}
+                category={getCategory(lastRun.categoryId)}
+                durationMin={lastRun.targetDurationMin}
+                onPress={() =>
+                  openCreateModal({
+                    categoryId: lastRun.categoryId,
+                    name: lastRun.spaceName ?? `${getCategory(lastRun.categoryId)?.name ?? 'Focus'} session`,
+                    durationMin: lastRun.targetDurationMin,
+                  })
+                }
+              />
             </View>
           ) : null}
 

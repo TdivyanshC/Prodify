@@ -1,6 +1,7 @@
 import { BlurView } from 'expo-blur';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Dimensions, Easing, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { mascotQuotes } from '../../mocks/mascotQuotes';
 import { SPARK_EVENT_MOOD, SPARK_EVENT_QUOTE_CATEGORY, useSparkOverlayStore } from '../../store/useSparkOverlayStore';
 import { colors, fonts } from '../../theme';
@@ -22,6 +23,7 @@ export function SparkOverlay() {
   const vars = useSparkOverlayStore((s) => s.vars);
   const hide = useSparkOverlayStore((s) => s.hide);
 
+  const insets = useSafeAreaInsets();
   const [messageIndex, setMessageIndex] = useState(0);
   // Tracks whether Spark's Modal/Canvas should be mounted at all — critical
   // now that the mascot is a live WebGL render, not a static image: Modal's
@@ -107,7 +109,8 @@ export function SparkOverlay() {
         )}
       </Animated.View>
 
-      <Pressable style={styles.tapCatcher} onPress={handleTap}>
+      // Lift Spark clear of the floating tab bar (~90px) so the character, bubble and "Tap for next" never sit on top of the nav labels.
+      <Pressable style={[styles.tapCatcher, { paddingBottom: insets.bottom + 110 }]} onPress={handleTap}>
         <Animated.View style={[styles.sparkWrap, { transform: [{ translateY }] }]}>
           <Mascot variant="compact" messageOverride={currentMessage} mood={mood} />
           <Text style={styles.hint}>{hasMoreAfterThis ? 'Tap for next' : 'Tap to close'}</Text>

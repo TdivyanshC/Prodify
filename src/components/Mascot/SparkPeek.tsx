@@ -6,17 +6,15 @@ import { colors, fonts } from '../../theme';
 // caused a repeated, confirmed ANR/freeze on-device).
 const mascotImage = require('../../assets/mascot/spark.png');
 const MASCOT_ASPECT_RATIO = 647 / 660;
-const PEEK_WIDTH = 68;
-const PEEK_VISIBLE_HEIGHT = 32;
+const PEEK_WIDTH = 56;
 
 interface SparkPeekProps {
   onPress: () => void;
 }
 
-// Wireframe §6: Spark lives partially below the visible screen — only a
-// small peek shows normally, on purpose ("should NOT look like a
-// permanently visible floating button"). This is the at-rest state;
-// SparkOverlay handles the full rise-up pop-up.
+// At-rest Spark: the whole character resting just above the tab bar, gently bobbing, with a small
+// "Tap Spark" pill beside it. (The earlier version clipped her head at a hard line in mid-air, which
+// read as a rendering bug.) SparkOverlay handles the full rise-up pop-up.
 export function SparkPeek({ onPress }: SparkPeekProps) {
   const bob = useRef(new Animated.Value(0)).current;
 
@@ -46,34 +44,33 @@ export function SparkPeek({ onPress }: SparkPeekProps) {
 
   return (
     <Pressable onPress={onPress} style={styles.container} accessibilityLabel="Spark">
-      <View style={styles.clip}>
-        <Animated.View style={{ transform: [{ translateY }] }}>
-          <Image
-            source={mascotImage}
-            resizeMode="contain"
-            style={{ width: PEEK_WIDTH, height: imageHeight }}
-          />
-        </Animated.View>
+      <Animated.View style={{ transform: [{ translateY }] }}>
+        <Image source={mascotImage} resizeMode="contain" style={{ width: PEEK_WIDTH, height: imageHeight }} />
+      </Animated.View>
+      <View style={styles.pill}>
+        <Text style={styles.hint}>Tap Spark</Text>
       </View>
-      <Text style={styles.hint}>Tap Spark</Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    alignItems: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-  clip: {
-    width: PEEK_WIDTH,
-    height: PEEK_VISIBLE_HEIGHT,
-    overflow: 'hidden',
-    justifyContent: 'flex-start',
+  pill: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   hint: {
     fontFamily: fonts.bodyMedium,
-    fontSize: 10,
-    color: colors.textMuted,
-    marginTop: 2,
+    fontSize: 12,
+    color: colors.textSecondary,
   },
 });
