@@ -12,7 +12,9 @@ import { WeeklyActivityChart } from '../components/Profile/WeeklyActivityChart';
 import { GOOGLE_AUTH_ENABLED } from '../api/config';
 import { ScreenBackground } from '../components/ScreenBackground/ScreenBackground';
 import { DESKTOP_BREAKPOINT } from '../navigation/routes';
+import { DeleteAccountButton } from '../components/Auth/DeleteAccountButton';
 import { SignOutButton } from '../components/Auth/SignOutButton';
+import { LegalLinks } from '../components/Profile/LegalLinks';
 import { useCatalogStore } from '../store/useCatalogStore';
 import { useUserStore } from '../store/useUserStore';
 import { colors, fonts, radii } from '../theme';
@@ -93,8 +95,12 @@ export function ProfileScreen() {
 
           {/* Auth paused (dev mode) has no sign-in screen to land on. */}
           {GOOGLE_AUTH_ENABLED ? (
-            <SignOutButton />
+            <>
+              <SignOutButton />
+              <DeleteAccountButton />
+            </>
           ) : null}
+          <LegalLinks />
         </View>
       </ScrollView>
     </SafeAreaView>

@@ -35,6 +35,8 @@ const schema = z
     JWT_SECRET: z.string().min(32).default('prodify-dev-only-jwt-secret-change-me-0000'),
     // Comma-separated browser origins. Native apps send no Origin header.
     CORS_ORIGINS: z.string().default('http://localhost:8081,http://localhost:19006'),
+    // Shown on the public privacy / terms pages as the place to write to. Optional.
+    SUPPORT_EMAIL: z.string().optional(),
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
     // Background job cadence can be sped up for demos/tests.
     JOBS_ENABLED: z

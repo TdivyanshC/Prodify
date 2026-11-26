@@ -13,6 +13,7 @@ import { rateLimit, validate } from '../../middleware/common';
 import { scheduleJob } from '../../jobs/scheduler';
 import { activity, buildRecap, homeSummary, recapDTO, stats } from '../analytics/service';
 import { deliver, pushMascotEvent } from '../notifications/deliver';
+import { deleteAccount } from './deleteAccount';
 import { areFriends, getBadges, getCategories, toUserDTO } from '../views';
 
 // Auth session, the signed-in user, and per-user settings.
@@ -210,6 +211,14 @@ meRoutes.patch('/', validate(patchSchema), async (req, res) => {
   const updated = await col('users').findOneAndUpdate({ _id: user._id }, { $set }, { returnDocument: 'after' });
   emit('user.updated', { userId: user._id });
   res.json(toUserDTO(updated!));
+});
+
+// Delete the signed-in account and all of its data (Play requires in-app deletion). Needs an
+// explicit ?confirm=delete so a stray request can't remove an account.
+meRoutes.delete('/', rateLimit('delete_account', 5, 60_000), async (req, res) => {
+  if (req.query.confirm !== 'delete') throw badRequest('CONFIRM_REQUIRED', 'Add ?confirm=delete to delete your account');
+  await deleteAccount(me(req)._id);
+  res.json({ ok: true });
 });
 
 meRoutes.get('/summary', async (req, res) => {

@@ -301,6 +301,31 @@ await step('reads: summary, feed, profile, stats, recap, mascot all respond', as
   assert(m.quote, 'quote');
 });
 
+await step('delete account: removes the user and their data, fixes friend counters, needs confirm', async () => {
+  const simran = await col('users').findOne({ firebaseUid: 'seed-simran' });
+  const victim = await col('users').findOne({ firebaseUid: 'seed-ishaan' });
+  assert(simran && victim, 'seed accounts missing');
+  const wasFriends = (await col('friendships').countDocuments({ status: 'accepted', $or: [{ userIdA: simran._id, userIdB: victim._id }, { userIdA: victim._id, userIdB: simran._id }] })) > 0;
+  const noConfirm = await api('seed-ishaan', 'DELETE', '/me');
+  assert(noConfirm.status === 400, `expected 400 without confirm, got ${noConfirm.status}`);
+  assert(await col('users').findOne({ _id: victim._id }), 'user deleted without confirm');
+  const res = await api('seed-ishaan', 'DELETE', '/me?confirm=delete');
+  assert(res.status === 200, `delete failed: ${res.status}`);
+  assert(!(await col('users').findOne({ _id: victim._id })), 'user still exists');
+  const owned = ['sessions', 'dailyStats', 'pointsLedger', 'notifications', 'authSessions', 'mascotEvents'] as const;
+  for (const name of owned) {
+    assert((await getDb().collection(name).countDocuments({ userId: victim._id })) === 0, `${name} still has the user's rows`);
+  }
+  assert((await col('friendships').countDocuments({ $or: [{ userIdA: victim._id }, { userIdB: victim._id }] })) === 0, 'friendships remain');
+  assert((await col('reactions').countDocuments({ $or: [{ fromUserId: victim._id }, { toUserId: victim._id }] })) === 0, 'reactions remain');
+  assert((await col('spaces').countDocuments({ hostId: victim._id })) === 0, 'spaces still hosted by deleted user');
+  const after = await api('seed-ishaan', 'GET', '/me');
+  assert(after.status === 401 || after.status === 404, `deleted account still signs in (${after.status})`);
+  const simranAfter = await col('users').findOne({ _id: simran._id });
+  const expected = simran.counters.friends - (wasFriends ? 1 : 0);
+  assert(simranAfter && simranAfter.counters.friends === expected, `friend counter ${simranAfter?.counters.friends}, expected ${expected}`);
+});
+
 await step('INVARIANTS hold on everything the live code wrote', async () => {
   const data: Record<string, any[]> = {};
   for (const name of COLLECTIONS) data[name] = await getDb().collection(name).find().toArray();

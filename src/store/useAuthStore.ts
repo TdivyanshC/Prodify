@@ -5,7 +5,7 @@ import { DEV_ACCOUNT, GOOGLE_AUTH_ENABLED } from '../api/config';
 import { connectRealtime, disconnectRealtime, setSessionRejectedHandler } from '../api/realtime';
 import { getGoogleIdToken, GoogleSignInCancelled, signOutOfGoogle } from '../auth/googleSignIn';
 import { getDeviceId, loadSessionToken, saveSessionToken } from '../auth/tokenStorage';
-import { logout, signInWithGoogleIdToken, startAuthSession } from '../services/userService';
+import { deleteMyAccount, logout, signInWithGoogleIdToken, startAuthSession } from '../services/userService';
 import type { User } from '../types/models';
 import { useCatalogStore } from './useCatalogStore';
 import { useFocusModeStore } from './useFocusModeStore';
@@ -37,6 +37,8 @@ interface AuthStoreState {
   signInWithGoogle: () => Promise<void>;
   signInWithDevAccount: (accountId?: string) => Promise<void>;
   signOut: () => Promise<void>;
+  // Deletes the account on the server, then clears everything local like a sign-out.
+  deleteAccount: () => Promise<void>;
 }
 
 const deviceInfo = async () => ({
@@ -134,6 +136,16 @@ export const useAuthStore = create<AuthStoreState>((set, get) => ({
     setAuthToken(null);
     await saveSessionToken(null);
     await signOutOfGoogle();
+    resetUserData();
+    set({ status: 'signed-out', isAuthenticated: false, error: null });
+  },
+
+  deleteAccount: async () => {
+    await deleteMyAccount(); // throws if the server refuses, so nothing local is cleared on failure
+    disconnectRealtime();
+    setAuthToken(null);
+    await saveSessionToken(null);
+    await signOutOfGoogle().catch(() => undefined);
     resetUserData();
     set({ status: 'signed-out', isAuthenticated: false, error: null });
   },

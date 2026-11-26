@@ -5,6 +5,7 @@ import { env, isDev } from './config/env';
 import { getDb } from './db/mongo';
 import { requireUser } from './middleware/auth';
 import { errorHandler, notFoundHandler, rateLimit, requestId } from './middleware/common';
+import { legalRoutes } from './modules/legal/routes';
 import { devRoutes } from './modules/dev/routes';
 import { mascotRoutes, notificationRoutes } from './modules/notifications/routes';
 import { sessionRoutes } from './modules/sessions/routes';
@@ -30,6 +31,8 @@ export function createApp() {
     await getDb().command({ ping: 1 });
     res.json({ ok: true, mongo: 'up', time: new Date().toISOString() });
   });
+
+  app.use(legalRoutes); // /privacy, /terms, /delete-account: public pages for the store listing
 
   const v1 = Router();
   v1.use('/auth', authRoutes);

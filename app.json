@@ -17,7 +17,7 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.prodify"
+      "package": "com.thesocialhood.prodify"
     },
     "web": {
       "favicon": "./assets/favicon.png"

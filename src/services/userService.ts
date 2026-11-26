@@ -31,6 +31,9 @@ export function signInWithGoogleIdToken(input: DeviceInfo & { idToken: string })
 // Revokes this device's session token.
 export const logout = () => api.post<{ ok: true }>('/auth/logout');
 
+// Permanently deletes the signed-in account and all of its data.
+export const deleteMyAccount = () => api.del<{ ok: true }>('/me?confirm=delete');
+
 export const getUserProfile = () => api.get<User>('/me');
 export const updateProfile = (patch: Partial<Pick<User, 'displayName' | 'tagline' | 'dailyTargetMin' | 'timezone'>>) =>
   api.patch<User>('/me', patch);
